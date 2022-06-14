@@ -1,16 +1,17 @@
 use clap::Parser;
-use libc::geteuid;
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
+use std::os::unix::process::CommandExt;
+use std::process::Command;
 use system_configuration::core_foundation::base::TCFType;
 use system_configuration::core_foundation::dictionary::CFDictionary;
 use system_configuration::core_foundation::number::CFNumber;
 use system_configuration::core_foundation::string::CFString;
 use system_configuration::preferences::SCPreferences;
 use system_configuration::sys::preferences::{SCPreferencesCommitChanges, SCPreferencesSetValue};
-use users::{get_current_groupname, get_current_username};
+use users::{get_current_groupname, get_current_username, get_effective_uid};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -29,6 +30,18 @@ struct Args {
         default_value_t = 60
     )]
     bootpd_lease_time: u32,
+
+    #[clap(long, help = "user name to drop privileges to")]
+    user: Option<String>,
+
+    #[clap(long, help = "group name to drop privileges to")]
+    group: Option<String>,
+
+    #[clap(long, hide=true)]
+    sudo_escalation_probing: bool,
+
+    #[clap(long, hide=true)]
+    sudo_escalation_done: bool,
 }
 
 fn main() {
@@ -44,8 +57,41 @@ fn main() {
 fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
 
+    // No need to run anything, just return
+    // so that the invoker process knows we
+    // can be invoked in Sudo as root
+    if args.sudo_escalation_probing {
+        return Ok(());
+    }
+
+    // Retrieve real (not effective) user and group names
+    let current_user_name = get_current_username()
+        .ok_or("failed to resolve real user name")?
+        .to_string_lossy()
+        .to_string();
+    let current_group_name = get_current_groupname()
+        .ok_or("failed to resolve real group name")?
+        .to_string_lossy()
+        .to_string();
+
     // Ensure we are running as root
-    if unsafe { geteuid() } != 0 {
+    if get_effective_uid() != 0 {
+        if sudo_escalation_works() && !args.sudo_escalation_done {
+            let exe = std::env::current_exe().unwrap();
+            let args = std::env::args().skip(1);
+
+            let _ = Command::new("sudo")
+                .arg("-n")
+                .arg(&exe)
+                .args(args)
+                .arg("--sudo-escalation-done")
+                .arg("--user")
+                .arg(current_user_name)
+                .arg("--group")
+                .arg(current_group_name)
+                .exec();
+        }
+
         return Err("root privileges are required to run".into());
     }
 
@@ -55,20 +101,30 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize the proxy while still having the root privileges
     let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address)?;
 
-    // Retrieve real (not effective) user and group names
-    let user = get_current_username().ok_or("failed to resolve real user name")?;
-    let group = get_current_groupname().ok_or("failed to resolve real group name")?;
-
     // Drop effective privileges to the user
     // and group which have had invoked us
     PrivDrop::default()
-        .user(user)
-        .group(group)
+        .user(args.user.unwrap_or(current_user_name))
+        .group(args.group.unwrap_or(current_group_name))
         .apply()
         .map_err(|err| format!("failed to drop privileges: {}", err))?;
 
     // Run proxy
     proxy.run().map_err(|err| err.into())
+}
+
+fn sudo_escalation_works() -> bool {
+    let exe = std::env::current_exe().unwrap();
+    let args = std::env::args().skip(1);
+
+    Command::new("sudo")
+        .arg("-n")
+        .arg(&exe)
+        .args(args)
+        .arg("--sudo-escalation-probing")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 fn set_bootpd_lease_time(lease_time: u32) {

@@ -22,10 +22,10 @@ And assumes that:
 
 For proper functioning Softnet binary requires two things:
 
-* a [SUID-bit](https://en.wikipedia.org/wiki/Setuid#SUID) set which effectively gives it `root` privileges
+* a [SUID-bit](https://en.wikipedia.org/wiki/Setuid#SUID) is set on the binary or [passwordless sudo](https://serverfault.com/questions/160581/how-to-setup-passwordless-sudo-on-linux) is enabled, which effectively gives the binary `root` privileges
   * this is needed in order to create [`vmnet.framework`](https://developer.apple.com/documentation/vmnet) interface and perform DHCP-related tweaks
-  * the privileges will be dropped once all of the initialization is completed
-* to be available in `PATH`
+  * the privileges will be dropped automatically to that of the calling user (or those represented by the `--user` and `--group` command-line arguments) once all of the initialization is completed
+* the binary is available in `PATH`
   * so that the Tart will be able to find it
 
 ## Running
