@@ -1,3 +1,15 @@
+env:
+  PATH: "$PATH:$HOME/.cargo/bin"
+
+task:
+  name: Build
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-monterey-xcode:14
+  install_rust_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  build_script:
+    - cargo build
+
 task:
   name: Release
   only_if: $CIRRUS_TAG != ''
