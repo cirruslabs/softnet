@@ -92,7 +92,7 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
                 .exec();
         }
 
-        return Err("root privileges are required to run".into());
+        return Err("root privileges are required to run and passwordless sudo was not available".into());
     }
 
     // Set bootpd(8) min/max lease time while still having the root privileges

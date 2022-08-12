@@ -68,6 +68,11 @@ impl Proxy {
             }
         }
 
+        // Allow communication with host
+        if ipv4_pkt.dst_addr() == self.host.gateway_ip {
+            return Some(());
+        }
+
         if ipv4_pkt.protocol() == IpProtocol::Udp {
             let udp_pkt = UdpPacket::new_checked(ipv4_pkt.payload()).ok()?;
 
@@ -77,11 +82,8 @@ impl Proxy {
                 return Some(());
             }
 
-            // Allow DHCP communication with the bootpd(8) on host
-            let allowed_dhcp_target =
-                ipv4_pkt.dst_addr().is_broadcast() || ipv4_pkt.dst_addr() == self.host.gateway_ip;
-
-            if udp_pkt.is_dhcp_request() && allowed_dhcp_target {
+            // Allow DHCP communication with the bootpd(8) on host via broadcast address
+            if udp_pkt.is_dhcp_request() && ipv4_pkt.dst_addr().is_broadcast() {
                 return Some(());
             }
         }
