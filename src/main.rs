@@ -27,7 +27,7 @@ struct Args {
     #[clap(
         long,
         help = "set bootpd(8) lease time to this value (in seconds) before starting the VM",
-        default_value_t = 60
+        default_value_t = 600
     )]
     bootpd_lease_time: u32,
 
