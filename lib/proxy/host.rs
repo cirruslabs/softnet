@@ -12,7 +12,9 @@ impl Proxy {
 
         // Snoop bootpd(8) replies from the host to
         // figure out the IP assigned to the VM
-        self.snoop(frame);
+        if frame.dst_addr() == self.vm_mac_address {
+            self.snoop(frame);
+        }
 
         self.vm
             .write(frame.as_ref())
