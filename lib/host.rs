@@ -107,7 +107,7 @@ impl Host {
             .map_err(|err| Error::VmnetFailed { source: err })?;
 
         // Now let the callback finish
-        self.callback_can_continue_tx.send(()).unwrap();
+        let _ = self.callback_can_continue_tx.send(());
 
         self.interface
             .finalize()
