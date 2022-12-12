@@ -23,5 +23,5 @@ task:
   install_goreleaser_script:
     - brew install go goreleaser/tap/goreleaser-pro
   build_script:
-    - cargo build --release
+    - cargo build --profile release-with-debug
   release_script: goreleaser

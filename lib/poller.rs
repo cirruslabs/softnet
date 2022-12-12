@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use anyhow::Result;
 use num_enum::IntoPrimitive;
 use std::os::unix::io::RawFd;
 use std::time::Duration;
@@ -19,8 +19,7 @@ enum EventKey {
 
 impl Poller {
     pub fn new(vm_fd: RawFd, host_fd: RawFd) -> Result<Poller> {
-        let poller =
-            polling::Poller::new().map_err(|err| Error::InitFailed { source: err.into() })?;
+        let poller = polling::Poller::new()?;
 
         Ok(Poller {
             poller,
@@ -31,13 +30,9 @@ impl Poller {
     }
 
     pub fn arm(&self) -> Result<()> {
+        self.poller.add(self.vm_fd as RawFd, self.vm_interest())?;
         self.poller
-            .add(self.vm_fd as RawFd, self.vm_interest())
-            .map_err(|err| Error::PollFailed { source: err })?;
-
-        self.poller
-            .add(self.host_fd as RawFd, self.host_interest())
-            .map_err(|err| Error::PollFailed { source: err })?;
+            .add(self.host_fd as RawFd, self.host_interest())?;
 
         Ok(())
     }
@@ -46,19 +41,16 @@ impl Poller {
         self.events.clear();
 
         self.poller
-            .modify(self.vm_fd as RawFd, self.vm_interest())
-            .map_err(|err| Error::PollFailed { source: err })?;
+            .modify(self.vm_fd as RawFd, self.vm_interest())?;
         self.poller
-            .modify(self.host_fd as RawFd, self.host_interest())
-            .map_err(|err| Error::PollFailed { source: err })?;
+            .modify(self.host_fd as RawFd, self.host_interest())?;
 
         Ok(())
     }
 
     pub fn wait(&mut self) -> Result<(bool, bool)> {
         self.poller
-            .wait(&mut self.events, Some(Duration::from_millis(100)))
-            .map_err(|err| Error::PollFailed { source: err })?;
+            .wait(&mut self.events, Some(Duration::from_millis(100)))?;
 
         let vm_readable = self.events.iter().any(|ev| ev.key == EventKey::VM.into());
         let host_readable = self.events.iter().any(|ev| ev.key == EventKey::Host.into());

@@ -1,10 +1,12 @@
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
+use std::env;
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
-use std::process::Command;
+use std::process::{Command, ExitCode};
 use system_configuration::core_foundation::base::TCFType;
 use system_configuration::core_foundation::dictionary::CFDictionary;
 use system_configuration::core_foundation::number::CFNumber;
@@ -37,24 +39,47 @@ struct Args {
     #[clap(long, help = "group name to drop privileges to")]
     group: Option<String>,
 
-    #[clap(long, hide=true)]
+    #[clap(long, hide = true)]
     sudo_escalation_probing: bool,
 
-    #[clap(long, hide=true)]
+    #[clap(long, hide = true)]
     sudo_escalation_done: bool,
 }
 
-fn main() {
-    if let Err(err) = try_main() {
-        match err.source() {
-            Some(source) => eprintln!("{}: {}", err, source),
-            None => eprintln!("{}", err),
+fn main() -> ExitCode {
+    // Enable backtraces by default
+    if env::var("RUST_BACKTRACE").is_err() {
+        env::set_var("RUST_BACKTRACE", "1");
+    }
+
+    // Initialize Sentry
+    let _sentry = sentry::init(sentry::ClientOptions {
+        ..Default::default()
+    });
+
+    // Enrich future events with Cirrus CI-specific tags
+    if let Ok(cirrus_task_id) = std::env::var("CIRRUS_TASK_ID") {
+        sentry::configure_scope(|scope| {
+            scope.set_tag("cirrus.task_id", cirrus_task_id);
+        });
+    }
+
+    match try_main() {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(err) => {
+            // Print the error into stderr
+            let causes: Vec<String> = err.chain().map(|x| x.to_string()).collect();
+            eprintln!("{}", causes.join(": "));
+
+            // Capture the error into Sentry
+            sentry_anyhow::capture_anyhow(&err);
+
+            ExitCode::FAILURE
         }
-        std::process::exit(1);
     }
 }
 
-fn try_main() -> Result<(), Box<dyn std::error::Error>> {
+fn try_main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
     // No need to run anything, just return
@@ -66,11 +91,11 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Retrieve real (not effective) user and group names
     let current_user_name = get_current_username()
-        .ok_or("failed to resolve real user name")?
+        .ok_or(anyhow!("failed to resolve real user name"))?
         .to_string_lossy()
         .to_string();
     let current_group_name = get_current_groupname()
-        .ok_or("failed to resolve real group name")?
+        .ok_or(anyhow!("failed to resolve real group name"))?
         .to_string_lossy()
         .to_string();
 
@@ -81,7 +106,8 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
             let args = std::env::args().skip(1);
 
             let _ = Command::new("sudo")
-                .arg("-n")
+                .arg("--non-interactive")
+                .arg("--preserve-env=SENTRY_DSN,CIRRUS_TASK_ID")
                 .arg(&exe)
                 .args(args)
                 .arg("--sudo-escalation-done")
@@ -92,14 +118,17 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
                 .exec();
         }
 
-        return Err("root privileges are required to run and passwordless sudo was not available".into());
+        return Err(anyhow!(
+            "root privileges are required to run and passwordless sudo was not available"
+        ));
     }
 
     // Set bootpd(8) min/max lease time while still having the root privileges
     set_bootpd_lease_time(args.bootpd_lease_time);
 
     // Initialize the proxy while still having the root privileges
-    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address)?;
+    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address)
+        .context("failed to initialize proxy")?;
 
     // Drop effective privileges to the user
     // and group which have had invoked us
@@ -107,10 +136,10 @@ fn try_main() -> Result<(), Box<dyn std::error::Error>> {
         .user(args.user.unwrap_or(current_user_name))
         .group(args.group.unwrap_or(current_group_name))
         .apply()
-        .map_err(|err| format!("failed to drop privileges: {}", err))?;
+        .context("failed to drop privileges")?;
 
     // Run proxy
-    proxy.run().map_err(|err| err.into())
+    proxy.run()
 }
 
 fn sudo_escalation_works() -> bool {

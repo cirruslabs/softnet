@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use anyhow::Result;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
 
@@ -9,8 +9,7 @@ pub struct VM {
 impl VM {
     pub fn new(vm_fd: RawFd) -> Result<VM> {
         let sock = unsafe { UnixDatagram::from_raw_fd(vm_fd) };
-        sock.set_nonblocking(true)
-            .map_err(|err| Error::InitFailed { source: err.into() })?;
+        sock.set_nonblocking(true)?;
 
         Ok(VM { sock })
     }
