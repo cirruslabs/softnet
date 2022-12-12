@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use anyhow::{anyhow, Context, Result};
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
@@ -27,27 +27,23 @@ impl Host {
                 ..Default::default()
             },
         )
-        .map_err(|err| Error::VmnetFailed { source: err })?;
+        .context("failed to initialize vmnet interface")?;
 
         // Retrieve first IP (gateway) used for this interface
-        let gateway_ip = match interface.parameters().get(ParameterKind::StartAddress) {
-            Some(Parameter::StartAddress(gateway_ip)) => gateway_ip,
-            _ => return Err(Error::VmnetUnexpected),
+        let Some(Parameter::StartAddress(gateway_ip)) = interface.parameters().get(ParameterKind::StartAddress) else {
+            return Err(anyhow!("failed to retrieve vmnet's interface start address"));
         };
-        let gateway_ip = Ipv4Addr::from_str(&gateway_ip).map_err(|_| Error::VmnetUnexpected)?;
+        let gateway_ip = Ipv4Addr::from_str(&gateway_ip)
+            .context("failed to parse vmnet's interface start address")?;
 
         // Retrieve max packet size for this interface
-        let max_packet_size = match interface.parameters().get(ParameterKind::MaxPacketSize) {
-            Some(Parameter::MaxPacketSize(max_packet_size)) => max_packet_size,
-            _ => return Err(Error::VmnetUnexpected),
+        let Some(Parameter::MaxPacketSize(max_packet_size)) = interface.parameters().get(ParameterKind::MaxPacketSize) else {
+            return Err(anyhow!("failed to retrieve vmnet's interface max packet size"));
         };
 
         // Set up a socketpair() to emulate polling of the vmnet interface
-        let (new_packets_tx, new_packets_rx) =
-            UnixDatagram::pair().map_err(|err| Error::InitFailed { source: err.into() })?;
-        new_packets_rx
-            .set_nonblocking(true)
-            .map_err(|err| Error::InitFailed { source: err.into() })?;
+        let (new_packets_tx, new_packets_rx) = UnixDatagram::pair()?;
+        new_packets_rx.set_nonblocking(true)?;
 
         let (callback_can_continue_tx, callback_can_continue_rx) = sync_channel(0);
 
@@ -64,7 +60,7 @@ impl Host {
                 // [1]: https://en.wikipedia.org/wiki/Blocks_(C_language_extension)
                 callback_can_continue_rx.recv().unwrap();
             })
-            .map_err(|err| Error::VmnetFailed { source: err })?;
+            .context("failed to set vmnet interface's event callback")?;
 
         Ok(Host {
             interface,
@@ -104,14 +100,14 @@ impl Host {
         // First make sure our callback won't be scheduled again after it finishes
         self.interface
             .clear_event_callback()
-            .map_err(|err| Error::VmnetFailed { source: err })?;
+            .context("failed to clear vmnet interface's event callback")?;
 
         // Now let the callback finish
         let _ = self.callback_can_continue_tx.send(());
 
         self.interface
             .finalize()
-            .map_err(|err| Error::VmnetFailed { source: err })?;
+            .context("failed to finalize vmnet's interface")?;
 
         self.finalized = true;
 

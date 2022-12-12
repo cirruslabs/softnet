@@ -1,6 +1,6 @@
 use crate::proxy::udp_packet_helper::UdpPacketHelper;
 use crate::proxy::Proxy;
-use crate::{Error, Result};
+use anyhow::{Context, Result};
 use smoltcp::wire::{EthernetFrame, EthernetProtocol, Ipv4Packet, UdpPacket};
 
 impl Proxy {
@@ -19,7 +19,7 @@ impl Proxy {
         self.vm
             .write(frame.as_ref())
             .map(|_| ())
-            .map_err(|err| Error::VMIOFailed { source: err })
+            .context("failed to write to the VM")
     }
 
     fn allowed_from_host(&mut self, frame: &EthernetFrame<&[u8]>) -> Option<()> {

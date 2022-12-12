@@ -6,8 +6,7 @@ use crate::dhcp_snooper::DhcpSnooper;
 use crate::host::Host;
 use crate::poller::Poller;
 use crate::vm::VM;
-use crate::Error;
-use crate::Result;
+use anyhow::Result;
 use mac_address::MacAddress;
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
@@ -69,7 +68,7 @@ impl Proxy {
                         return Ok(());
                     }
 
-                    return Err(Error::VMIOFailed { source: err });
+                    return Err(err.into());
                 }
             }
         }
@@ -88,7 +87,7 @@ impl Proxy {
                         return Ok(());
                     }
 
-                    return Err(Error::HostIOFailed { source: err });
+                    return Err(err.into());
                 }
             }
         }

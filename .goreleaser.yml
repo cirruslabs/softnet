@@ -7,7 +7,7 @@ builds:
     goarch:
       - arm64
     prebuilt:
-      path: target/release/softnet
+      path: "target/release-with-debug/softnet"
 
 archives:
   - id: binary
