@@ -58,9 +58,11 @@ fn main() -> ExitCode {
     });
 
     // Enrich future events with Cirrus CI-specific tags
-    if let Ok(cirrus_task_id) = std::env::var("CIRRUS_TASK_ID") {
+    if let Ok(tags) = env::var("CIRRUS_SENTRY_TAGS") {
         sentry::configure_scope(|scope| {
-            scope.set_tag("cirrus.task_id", cirrus_task_id);
+            for (key, value) in tags.split(",").map(|tag| tag.split_once("=")).flatten() {
+                scope.set_tag(key, value);
+            }
         });
     }
 
@@ -107,7 +109,7 @@ fn try_main() -> anyhow::Result<()> {
 
             let _ = Command::new("sudo")
                 .arg("--non-interactive")
-                .arg("--preserve-env=SENTRY_DSN,CIRRUS_TASK_ID")
+                .arg("--preserve-env=SENTRY_DSN,CIRRUS_SENTRY_TAGS")
                 .arg(&exe)
                 .args(args)
                 .arg("--sudo-escalation-done")
