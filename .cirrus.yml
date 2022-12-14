@@ -27,6 +27,8 @@ task:
     - brew install go goreleaser/tap/goreleaser-pro
   build_script:
     - cargo build --profile release-with-debug
+  install_sentry_cli_script:
+    - brew install getsentry/tools/sentry-cli
   upload_sentry_debug_files_script:
     - cd target/release-with-debug/
     # Generate and upload symbols
