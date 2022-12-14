@@ -16,10 +16,21 @@ impl Proxy {
             self.snoop(frame);
         }
 
-        self.vm
-            .write(frame.as_ref())
-            .map(|_| ())
-            .context("failed to write to the VM")
+        match self.vm.write(frame.as_ref()) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                if let Some(libc::ENOBUFS) = err.raw_os_error() {
+                    sentry::capture_message(
+                        "No buffer space available in VM's socket",
+                        sentry::Level::Warning,
+                    );
+
+                    return Ok(());
+                }
+
+                Err(err).context("failed to write to the VM")
+            }
+        }
     }
 
     fn allowed_from_host(&mut self, frame: &EthernetFrame<&[u8]>) -> Option<()> {
