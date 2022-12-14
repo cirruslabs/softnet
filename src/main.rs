@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
+use std::borrow::Cow;
 use std::env;
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
@@ -54,6 +55,7 @@ fn main() -> ExitCode {
 
     // Initialize Sentry
     let _sentry = sentry::init(sentry::ClientOptions {
+        release: option_env!("CIRRUS_TAG").map(|tag| { Cow::from(format!("softnet@{tag}")) }),
         ..Default::default()
     });
 
