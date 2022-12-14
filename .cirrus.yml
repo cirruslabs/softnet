@@ -38,7 +38,7 @@ task:
     - sentry-cli debug-files upload -o $SENTRY_ORG -p $SENTRY_PROJECT softnet.src.zip
   create_sentry_release_script:
     - export SENTRY_RELEASE="softnet@$CIRRUS_TAG"
-    - sentry-cli releases new -p $SENTRY_PROJECT $SENTRY_RELEASE
+    - sentry-cli releases new $SENTRY_RELEASE
     - sentry-cli releases set-commits $SENTRY_RELEASE --auto
     - sentry-cli releases finalize $SENTRY_RELEASE
     - sentry-cli releases deploys $SENTRY_RELEASE new -e production
