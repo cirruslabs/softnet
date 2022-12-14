@@ -49,7 +49,7 @@ struct Args {
 fn main() -> ExitCode {
     // Enable backtraces by default
     if env::var("RUST_BACKTRACE").is_err() {
-        env::set_var("RUST_BACKTRACE", "1");
+        env::set_var("RUST_BACKTRACE", "full");
     }
 
     // Initialize Sentry
