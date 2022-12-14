@@ -41,4 +41,3 @@ task:
     - sentry-cli releases new $SENTRY_RELEASE
     - sentry-cli releases set-commits $SENTRY_RELEASE --auto
     - sentry-cli releases finalize $SENTRY_RELEASE
-    - sentry-cli releases deploys $SENTRY_RELEASE new -e production
