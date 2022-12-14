@@ -52,8 +52,14 @@ impl Poller {
         self.poller
             .wait(&mut self.events, Some(Duration::from_millis(100)))?;
 
-        let vm_readable = self.events.iter().any(|ev| ev.key == EventKey::VM.into());
-        let host_readable = self.events.iter().any(|ev| ev.key == EventKey::Host.into());
+        let vm_readable = self
+            .events
+            .iter()
+            .any(|ev| ev.key == Into::<usize>::into(EventKey::VM));
+        let host_readable = self
+            .events
+            .iter()
+            .any(|ev| ev.key == Into::<usize>::into(EventKey::Host));
 
         Ok((vm_readable, host_readable))
     }
