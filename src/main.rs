@@ -53,7 +53,9 @@ fn main() -> ExitCode {
     }
 
     // Initialize Sentry
+
     let _sentry = sentry::init(sentry::ClientOptions {
+        release: option_env!("CIRRUS_TAG").and_then(|tag| { format!("softnet@{}", tag) }),
         ..Default::default()
     });
 
