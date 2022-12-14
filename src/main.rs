@@ -60,7 +60,7 @@ fn main() -> ExitCode {
     // Enrich future events with Cirrus CI-specific tags
     if let Ok(tags) = env::var("CIRRUS_SENTRY_TAGS") {
         sentry::configure_scope(|scope| {
-            for (key, value) in tags.split(",").map(|tag| tag.split_once("=")).flatten() {
+            for (key, value) in tags.split(',').filter_map(|tag| tag.split_once('=')) {
                 scope.set_tag(key, value);
             }
         });
