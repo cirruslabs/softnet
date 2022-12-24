@@ -18,6 +18,7 @@ pub struct Proxy {
     poller: Poller,
     vm_mac_address: smoltcp::wire::EthernetAddress,
     dhcp_snooper: DhcpSnooper,
+    enobufs_encountered: bool,
 }
 
 impl Proxy {
@@ -32,6 +33,7 @@ impl Proxy {
             poller,
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
             dhcp_snooper: Default::default(),
+            enobufs_encountered: false,
         })
     }
 

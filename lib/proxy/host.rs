@@ -20,10 +20,13 @@ impl Proxy {
             Ok(_) => Ok(()),
             Err(err) => {
                 if let Some(libc::ENOBUFS) = err.raw_os_error() {
-                    sentry::capture_message(
-                        "No buffer space available in VM's socket",
-                        sentry::Level::Warning,
-                    );
+                    if !self.enobufs_encountered {
+                        sentry::capture_message(
+                            "No buffer space available in VM's socket",
+                            sentry::Level::Warning,
+                        );
+                        self.enobufs_encountered = true;
+                    }
 
                     return Ok(());
                 }
