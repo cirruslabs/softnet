@@ -64,7 +64,9 @@ impl Proxy {
             let dst_is_global =
                 ip_network::IpNetwork::from(Ipv4Addr::from(ipv4_pkt.dst_addr().0)).is_global();
 
-            if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global {
+            if (lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global)
+                || ipv4_pkt.dst_addr() == Ipv4Addr::new(169, 254, 169, 254).into()
+            {
                 return Some(());
             }
         }
