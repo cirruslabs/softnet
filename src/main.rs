@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
+use nix::sys::signal::{kill, SIGSTOP};
+use nix::unistd::getpid;
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
 use std::borrow::Cow;
@@ -45,6 +47,9 @@ struct Args {
 
     #[clap(long, hide = true)]
     sudo_escalation_done: bool,
+
+    #[clap(long, hide = true)]
+    sudo_escalation_interactive: bool,
 }
 
 fn main() -> ExitCode {
@@ -105,26 +110,33 @@ fn try_main() -> anyhow::Result<()> {
 
     // Ensure we are running as root
     if get_effective_uid() != 0 {
-        if sudo_escalation_works() && !args.sudo_escalation_done {
-            let exe = std::env::current_exe().unwrap();
-            let args = std::env::args().skip(1);
+        if !args.sudo_escalation_done && args.sudo_escalation_interactive {
+            eprintln!("Softnet requires a Sudo password (passwordless Sudo is not available), please enter it below.");
 
-            let _ = Command::new("sudo")
-                .arg("--non-interactive")
-                .arg("--preserve-env=SENTRY_DSN,CIRRUS_SENTRY_TAGS")
-                .arg(&exe)
-                .args(args)
-                .arg("--sudo-escalation-done")
-                .arg("--user")
-                .arg(current_user_name)
-                .arg("--group")
-                .arg(current_group_name)
-                .exec();
+            Err(sudo_escalation_command(
+                current_user_name.clone(),
+                current_group_name.clone(),
+                true,
+            )
+            .exec())
+            .context("failed to execute Sudo")?;
+        }
+
+        if !args.sudo_escalation_done && sudo_escalation_works() {
+            Err(sudo_escalation_command(current_user_name, current_group_name, false).exec())
+                .context("failed to execute Sudo")?;
         }
 
         return Err(anyhow!(
-            "root privileges are required to run and passwordless sudo was not available"
+            "root privileges are required to run, yet passwordless Sudo was not available"
         ));
+    }
+
+    // Stop ourselves and unblock the waitid(2) call in the Tart
+    // to signify that we're ready to proceed after the user has
+    // entered the Sudo password
+    if args.sudo_escalation_interactive {
+        kill(getpid(), SIGSTOP).unwrap();
     }
 
     // Set bootpd(8) min/max lease time while still having the root privileges
@@ -144,6 +156,34 @@ fn try_main() -> anyhow::Result<()> {
 
     // Run proxy
     proxy.run()
+}
+
+fn sudo_escalation_command(
+    current_user_name: String,
+    current_group_name: String,
+    interactive: bool,
+) -> Command {
+    let exe = env::current_exe().unwrap();
+    let args = env::args().skip(1);
+
+    // Sudo-specific options
+    let mut command = Command::new("sudo");
+    if !interactive {
+        command.arg("--non-interactive");
+    }
+    command.arg("--preserve-env=SENTRY_DSN,CIRRUS_SENTRY_TAGS");
+
+    // Softnet-specific options
+    command
+        .arg(&exe)
+        .args(args)
+        .arg("--sudo-escalation-done")
+        .arg("--user")
+        .arg(current_user_name)
+        .arg("--group")
+        .arg(current_group_name);
+
+    command
 }
 
 fn sudo_escalation_works() -> bool {
