@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
+use nix::sys::signal::{signal, SigHandler, Signal};
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
 use std::borrow::Cow;
@@ -84,6 +85,8 @@ fn main() -> ExitCode {
 }
 
 fn try_main() -> anyhow::Result<()> {
+    unsafe { signal(Signal::SIGINT, SigHandler::SigIgn) }?;
+
     let args: Args = Args::parse();
 
     // No need to run anything, just return

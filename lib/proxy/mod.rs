@@ -43,7 +43,7 @@ impl Proxy {
         self.poller.arm()?;
 
         loop {
-            let (vm_readable, host_readable) = self.poller.wait()?;
+            let (vm_readable, host_readable, interrupt) = self.poller.wait()?;
 
             if vm_readable {
                 self.read_from_vm(buf.as_mut_slice())?;
@@ -51,6 +51,11 @@ impl Proxy {
 
             if host_readable {
                 self.read_from_host(buf.as_mut_slice())?;
+            }
+
+            // Graceful termination
+            if interrupt {
+                return Ok(());
             }
 
             self.poller.rearm()?;
