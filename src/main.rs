@@ -85,6 +85,12 @@ fn main() -> ExitCode {
 }
 
 fn try_main() -> anyhow::Result<()> {
+    // The default signal(3)[1] action for SIGINT is to interrupt program,
+    // but we want to handle SIGINT ourselves, so we ignore it. The kqueue(2)'s[2]
+    // EVFILT_SIGNAL will receive it anyways, because it has lower precedence.
+    //
+    // [1]: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/signal.3.html
+    // [2]: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kqueue.2.html
     unsafe { signal(Signal::SIGINT, SigHandler::SigIgn) }?;
 
     let args: Args = Args::parse();
