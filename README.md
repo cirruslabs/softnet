@@ -7,7 +7,7 @@ Softnet is a software networking for [Tart](https://github.com/cirruslabs/tart) 
 Softnet solves two problems:
 
 1. VM network isolation
-  * [`VZNATNetworkDeviceAttachment`](https://developer.apple.com/documentation/virtualization/vznatnetworkdeviceattachment) (the default networking in Tart) enables [vmnet's bridge isolation](https://developer.apple.com/documentation/vmnet/vmnet_enable_isolation_key) by default and prevents cross-VM traffic, however it's still possible for any VM to spoof the host's ARP-table and capture other VMs traffic, for example
+  * [`VZNATNetworkDeviceAttachment`](https://developer.apple.com/documentation/virtualization/vznatnetworkdeviceattachment) (the default networking in Tart) enables [vmnet's bridge isolation](https://developer.apple.com/documentation/vmnet/vmnet_enable_isolation_key) by default and prevents cross-VM traffic, however it's still possible for any VM to spoof the host's ARP-table and capture other VMs traffic
 2. DHCP exhaustion
   * macOS built-in DHCP-server allocates a `/24` subnet with 86400 seconds lease time by default, which only allows for ~253 VMs a day (or 1 VM every ~6 minutes) to be spawned without causing a denial-of-service, which is pretty limiting for CI services like Cirrus CI
 
@@ -30,4 +30,4 @@ For proper functioning, Softnet binary requires two things:
 
 ## Running
 
-Softnet is started and managed automatically by Tart if `--with-softnet` flag is present when calling `tart run`.
+Softnet is started and managed automatically by Tart if `--net-softnet` flag is provided when calling `tart run`.
