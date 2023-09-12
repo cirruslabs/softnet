@@ -22,7 +22,7 @@ mac_address = "1.1.3"
 privdrop = "0.5.2"
 anyhow = { version = "1.0.66", features = ["backtrace"] }
 ip_network = "0.4.1"
-users = "0.11.0"
+uzers = "0.11.3"
 system-configuration = "0.5.0"
 num_enum = "0.5.7"
 sentry = { version = "0.29.1", features = ["debug-images"] }

@@ -15,7 +15,7 @@ use system_configuration::core_foundation::number::CFNumber;
 use system_configuration::core_foundation::string::CFString;
 use system_configuration::preferences::SCPreferences;
 use system_configuration::sys::preferences::{SCPreferencesCommitChanges, SCPreferencesSetValue};
-use users::{get_current_groupname, get_current_username, get_effective_uid};
+use uzers::{get_current_groupname, get_current_username, get_effective_uid};
 
 #[derive(Parser, Debug)]
 struct Args {
