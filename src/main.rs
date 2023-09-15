@@ -3,7 +3,6 @@ use clap::Parser;
 use nix::sys::signal::{signal, SigHandler, Signal};
 use privdrop::PrivDrop;
 use softnet::proxy::Proxy;
-use std::borrow::Cow;
 use std::env;
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
@@ -54,30 +53,12 @@ fn main() -> ExitCode {
         env::set_var("RUST_BACKTRACE", "full");
     }
 
-    // Initialize Sentry
-    let _sentry = sentry::init(sentry::ClientOptions {
-        release: option_env!("CIRRUS_TAG").map(|tag| Cow::from(format!("softnet@{tag}"))),
-        ..Default::default()
-    });
-
-    // Enrich future events with Cirrus CI-specific tags
-    if let Ok(tags) = env::var("CIRRUS_SENTRY_TAGS") {
-        sentry::configure_scope(|scope| {
-            for (key, value) in tags.split(',').filter_map(|tag| tag.split_once('=')) {
-                scope.set_tag(key, value);
-            }
-        });
-    }
-
     match try_main() {
         Ok(_) => ExitCode::SUCCESS,
         Err(err) => {
             // Print the error into stderr
             let causes: Vec<String> = err.chain().map(|x| x.to_string()).collect();
             eprintln!("{}", causes.join(": "));
-
-            // Capture the error into Sentry
-            sentry_anyhow::capture_anyhow(&err);
 
             ExitCode::FAILURE
         }
@@ -120,7 +101,6 @@ fn try_main() -> anyhow::Result<()> {
 
             let _ = Command::new("sudo")
                 .arg("--non-interactive")
-                .arg("--preserve-env=SENTRY_DSN,CIRRUS_SENTRY_TAGS")
                 .arg(&exe)
                 .args(args)
                 .arg("--sudo-escalation-done")

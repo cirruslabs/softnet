@@ -3,6 +3,8 @@
 Softnet is a software networking for [Tart](https://github.com/cirruslabs/tart) which provides better network isolation and alleviates DHCP shortage on production systems.
 Please check out [this blog post](https://cirrus-ci.org/blog/2022/07/07/isolating-network-between-tarts-macos-virtual-machines/) for backstory.
 
+This is its fork specific to our usage in EAS Build.
+
 ## Working model
 
 Softnet solves two problems:
