@@ -4,17 +4,18 @@ env:
 task:
   name: Build
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-monterey-xcode:14
+    image: ghcr.io/cirruslabs/macos-sonoma-xcode:latest
   install_rust_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - rustup target add x86_64-apple-darwin
   build_script:
-    - cargo build
+    - cargo build --target aarch64-apple-darwin --target x86_64-apple-darwin
 
 task:
   name: Release
   only_if: $CIRRUS_TAG != ''
   macos_instance:
-    image: ghcr.io/cirruslabs/macos-monterey-xcode:14
+    image: ghcr.io/cirruslabs/macos-sonoma-xcode:latest
   env:
     GITHUB_TOKEN: ENCRYPTED[!98ace8259c6024da912c14d5a3c5c6aac186890a8d4819fad78f3e0c41a4e0cd3a2537dd6e91493952fb056fa434be7c!]
     GORELEASER_KEY: ENCRYPTED[!9b80b6ef684ceaf40edd4c7af93014ee156c8aba7e6e5795f41c482729887b5c31f36b651491d790f1f668670888d9fd!]
@@ -23,13 +24,14 @@ task:
     SENTRY_AUTH_TOKEN: ENCRYPTED[!c16a5cf7da5f856b4bc2f21fe8cb7aa2a6c981f851c094ed4d3025fd02ea59a58a86cee8b193a69a1fc20fa217e56ac3!]
   install_rust_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - rustup target add x86_64-apple-darwin
   install_script:
     - brew install go goreleaser/tap/goreleaser-pro getsentry/tools/sentry-cli
   build_script:
-    - cargo build --profile release-with-debug
+    - cargo build --target aarch64-apple-darwin --target x86_64-apple-darwin --profile release-with-debug
   release_script: goreleaser
   upload_sentry_debug_files_script:
-    - cd target/release-with-debug/
+    - cd target/aarch64-apple-darwin/release-with-debug/
     # Generate and upload symbols
     - dsymutil softnet
     - sentry-cli debug-files upload -o $SENTRY_ORG -p $SENTRY_PROJECT softnet.dSYM/
