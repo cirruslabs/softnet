@@ -3,6 +3,7 @@ project_name: softnet
 builds:
   - id: softnet
     builder: prebuilt
+    goamd64: [v1]
     goos:
       - darwin
     goarch:
