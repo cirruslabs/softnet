@@ -19,10 +19,13 @@ builds:
       path: "target/x86_64-apple-darwin/release-with-debug/softnet"
 
 archives:
-  - id: binary
-    format: binary
+  - id: regular-arm64
+    builds:
+      - softnet-arm64
     name_template: "{{ .ProjectName }}-{{ .Arch }}"
-  - id: regular
+  - id: regular-x86
+    builds:
+      - softnet-x86
     name_template: "{{ .ProjectName }}-{{ .Arch }}"
 
 release:
@@ -31,7 +34,8 @@ release:
 brews:
   - name: softnet
     ids:
-      - regular
+      - regular-arm64
+      - regular-x86
     tap:
       owner: cirruslabs
       name: homebrew-cli
