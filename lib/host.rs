@@ -18,10 +18,13 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn new() -> Result<Host> {
-        // Initialize a vmnet.framework NAT interface with isolation enabled
+    pub fn new(vm_net_type: &str) -> Result<Host> {
+        // Initialize a vmnet.framework NAT or Host interface with isolation enabled
         let mut interface = vmnet::Interface::new(
-            Mode::Shared(Default::default()),
+            match vm_net_type {
+                "host" => Mode::Host(Default::default()),
+                /* nat */_ => Mode::Shared(Default::default()),
+            },
             Options {
                 enable_isolation: Some(true),
                 ..Default::default()

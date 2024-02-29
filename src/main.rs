@@ -28,6 +28,9 @@ struct Args {
     #[clap(long, help = "MAC address to enforce for the VM")]
     vm_mac_address: mac_address::MacAddress,
 
+    #[clap(long, help = "type of network to use for the VM: 'nat', 'host' (default: nat)")]
+    vm_net_type: Option<String>,
+
     #[clap(
         long,
         help = "set bootpd(8) lease time to this value (in seconds) before starting the VM",
@@ -102,6 +105,14 @@ fn try_main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Enable setting of the vm_net_type through the env variable
+    let mut vm_net_type = args.vm_net_type.unwrap_or(String::new());
+    if vm_net_type.is_empty() {
+        if let Ok(val) = env::var("SOFTNET_NET_TYPE") {
+            vm_net_type = val;
+        }
+    }
+
     // Retrieve real (not effective) user and group names
     let current_user_name = get_current_username()
         .ok_or(anyhow!("failed to resolve real user name"))?
@@ -140,7 +151,7 @@ fn try_main() -> anyhow::Result<()> {
     set_bootpd_lease_time(args.bootpd_lease_time);
 
     // Initialize the proxy while still having the root privileges
-    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address)
+    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address, vm_net_type.as_str())
         .context("failed to initialize proxy")?;
 
     // Drop effective privileges to the user
