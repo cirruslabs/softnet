@@ -4,6 +4,7 @@ mod vm;
 
 use crate::dhcp_snooper::DhcpSnooper;
 use crate::host::Host;
+use crate::host::NetType;
 use crate::poller::Poller;
 use crate::vm::VM;
 use anyhow::Result;
@@ -22,7 +23,7 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    pub fn new(vm_fd: RawFd, vm_mac_address: MacAddress, vm_net_type: &str) -> Result<Proxy> {
+    pub fn new(vm_fd: RawFd, vm_mac_address: MacAddress, vm_net_type: NetType) -> Result<Proxy> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type)?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;

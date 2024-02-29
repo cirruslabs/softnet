@@ -1,3 +1,4 @@
+use clap::ArgEnum;
 use anyhow::{anyhow, Context, Result};
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -7,6 +8,18 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 use vmnet::mode::Mode;
 use vmnet::parameters::{Parameter, ParameterKind};
 use vmnet::{Events, Options};
+
+#[derive(ArgEnum, Clone, Debug)]
+pub enum NetType {
+    /// Shared network
+    ///
+    /// Uses NAT-translation to give guests access to the global network
+    Nat,
+    /// Host network
+    ///
+    /// Guests will be able to talk only to the host without access to global network
+    Host,
+}
 
 pub struct Host {
     interface: vmnet::Interface,
@@ -18,12 +31,12 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn new(vm_net_type: &str) -> Result<Host> {
+    pub fn new(vm_net_type: NetType) -> Result<Host> {
         // Initialize a vmnet.framework NAT or Host interface with isolation enabled
         let mut interface = vmnet::Interface::new(
             match vm_net_type {
-                "host" => Mode::Host(Default::default()),
-                /* nat */_ => Mode::Shared(Default::default()),
+                NetType::Nat => Mode::Shared(Default::default()),
+                NetType::Host => Mode::Host(Default::default()),
             },
             Options {
                 enable_isolation: Some(true),
