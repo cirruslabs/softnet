@@ -29,7 +29,7 @@ struct Args {
     #[clap(long, help = "MAC address to enforce for the VM")]
     vm_mac_address: mac_address::MacAddress,
 
-    #[clap(long, arg_enum, help = "type of network to use for the VM: 'nat', 'host' (default: nat)")]
+    #[clap(long, arg_enum, help = "type of network to use for the VM", default_value_t=NetType::Nat)]
     vm_net_type: NetType,
 
     #[clap(

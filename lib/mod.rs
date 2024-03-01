@@ -1,5 +1,6 @@
 mod dhcp_snooper;
-pub mod host;
+mod host;
+pub use host::NetType;
 mod poller;
 pub mod proxy;
 mod vm;
