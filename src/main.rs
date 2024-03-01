@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use nix::sys::signal::{signal, SigHandler, Signal};
 use privdrop::PrivDrop;
-use softnet::host::NetType;
+use softnet::NetType;
 use softnet::proxy::Proxy;
 use std::borrow::Cow;
 use std::env;
