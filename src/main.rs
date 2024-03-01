@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use nix::sys::signal::{signal, SigHandler, Signal};
 use privdrop::PrivDrop;
+use softnet::NetType;
 use softnet::proxy::Proxy;
 use std::borrow::Cow;
 use std::env;
@@ -27,6 +28,9 @@ struct Args {
 
     #[clap(long, help = "MAC address to enforce for the VM")]
     vm_mac_address: mac_address::MacAddress,
+
+    #[clap(long, arg_enum, help = "type of network to use for the VM", default_value_t=NetType::Nat)]
+    vm_net_type: NetType,
 
     #[clap(
         long,
@@ -140,7 +144,7 @@ fn try_main() -> anyhow::Result<()> {
     set_bootpd_lease_time(args.bootpd_lease_time);
 
     // Initialize the proxy while still having the root privileges
-    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address)
+    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address, args.vm_net_type)
         .context("failed to initialize proxy")?;
 
     // Drop effective privileges to the user
