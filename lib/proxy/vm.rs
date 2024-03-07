@@ -2,6 +2,7 @@ use crate::proxy::udp_packet_helper::UdpPacketHelper;
 use crate::proxy::Proxy;
 use anyhow::Context;
 use anyhow::Result;
+use ip_network::IpNetwork;
 use smoltcp::wire::{
     ArpPacket, EthernetFrame, EthernetProtocol, IpProtocol, Ipv4Packet, UdpPacket,
 };
@@ -61,10 +62,14 @@ impl Proxy {
         // Once we've learned the VM's IP from the DHCP snooping,
         // allow all global traffic for that VM's IP
         if let Some(lease) = &self.dhcp_snooper.lease() {
-            let dst_is_global =
-                ip_network::IpNetwork::from(Ipv4Addr::from(ipv4_pkt.dst_addr().0)).is_global();
+            let ip_net = &ip_network::IpNetwork::from(Ipv4Addr::from(ipv4_pkt.dst_addr().0));
+            let dst_is_global_or_private =
+              match &ip_net {
+                ip_network::IpNetwork::V4(ip_net) => ip_net.is_global() || ip_net.is_private(),
+                ip_network::IpNetwork::V6(ip_net) => ip_net.is_global(),
+              }
 
-            if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global {
+            if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global_or_private {
                 return Some(());
             }
         }
