@@ -2,7 +2,6 @@ use crate::proxy::udp_packet_helper::UdpPacketHelper;
 use crate::proxy::Proxy;
 use anyhow::Context;
 use anyhow::Result;
-use ip_network::IpNetwork;
 use smoltcp::wire::{
     ArpPacket, EthernetFrame, EthernetProtocol, IpProtocol, Ipv4Packet, UdpPacket,
 };
@@ -67,7 +66,7 @@ impl Proxy {
               match &ip_net {
                 ip_network::IpNetwork::V4(ip_net) => ip_net.is_global() || ip_net.is_private(),
                 ip_network::IpNetwork::V6(ip_net) => ip_net.is_global(),
-              }
+              };
 
             if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global_or_private {
                 return Some(());
