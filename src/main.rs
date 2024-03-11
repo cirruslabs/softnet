@@ -32,7 +32,7 @@ struct Args {
     #[clap(long, help = "MAC address to enforce for the VM")]
     vm_mac_address: mac_address::MacAddress,
 
-    #[clap(long, arg_enum, help = "type of network to use for the VM", default_value_t=NetType::Nat)]
+    #[clap(long, value_enum, help = "type of network to use for the VM", default_value_t=NetType::Nat)]
     vm_net_type: NetType,
 
     #[clap(
@@ -51,7 +51,9 @@ struct Args {
     #[clap(
         long,
         help = "comma-separated list of CIDRs to allow the traffic to (e.g. --allow=192.168.0.0/24)",
-        use_value_delimiter = true
+        value_name = "comma-separated CIDRs",
+        use_value_delimiter = true,
+        action = clap::ArgAction::Set
     )]
     allow: Vec<Ipv4Net>,
 
