@@ -8,7 +8,9 @@ use crate::host::NetType;
 use crate::poller::Poller;
 use crate::vm::VM;
 use anyhow::Result;
+use ipnet::Ipv4Net;
 use mac_address::MacAddress;
+use prefix_trie::PrefixSet;
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -19,11 +21,17 @@ pub struct Proxy {
     poller: Poller,
     vm_mac_address: smoltcp::wire::EthernetAddress,
     dhcp_snooper: DhcpSnooper,
+    allow: PrefixSet<Ipv4Net>,
     enobufs_encountered: bool,
 }
 
 impl Proxy {
-    pub fn new(vm_fd: RawFd, vm_mac_address: MacAddress, vm_net_type: NetType) -> Result<Proxy> {
+    pub fn new(
+        vm_fd: RawFd,
+        vm_mac_address: MacAddress,
+        vm_net_type: NetType,
+        allow: PrefixSet<Ipv4Net>,
+    ) -> Result<Proxy> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type)?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
@@ -34,6 +42,7 @@ impl Proxy {
             poller,
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
             dhcp_snooper: Default::default(),
+            allow,
             enobufs_encountered: false,
         })
     }

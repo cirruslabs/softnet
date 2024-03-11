@@ -28,3 +28,5 @@ num_enum = "0.5.7"
 sentry = { version = "0.29.1", features = ["debug-images"] }
 sentry-anyhow = { version = "0.29.1", features = ["backtrace"] }
 nix = "0.26.2"
+prefix-trie = "0.3.0"
+ipnet = "2.9.0"
