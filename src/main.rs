@@ -1,11 +1,14 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
+use ipnet::Ipv4Net;
 use nix::sys::signal::{signal, SigHandler, Signal};
+use prefix_trie::PrefixSet;
 use privdrop::PrivDrop;
-use softnet::NetType;
 use softnet::proxy::Proxy;
+use softnet::NetType;
 use std::borrow::Cow;
 use std::env;
+
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
@@ -44,6 +47,13 @@ struct Args {
 
     #[clap(long, help = "group name to drop privileges to")]
     group: Option<String>,
+
+    #[clap(
+        long,
+        help = "comma-separated list of CIDRs to allow the traffic to (e.g. --allow=192.168.0.0/24)",
+        use_value_delimiter = true
+    )]
+    allow: Vec<Ipv4Net>,
 
     #[clap(long, hide = true)]
     sudo_escalation_probing: bool,
@@ -144,8 +154,13 @@ fn try_main() -> anyhow::Result<()> {
     set_bootpd_lease_time(args.bootpd_lease_time);
 
     // Initialize the proxy while still having the root privileges
-    let mut proxy = Proxy::new(args.vm_fd as RawFd, args.vm_mac_address, args.vm_net_type)
-        .context("failed to initialize proxy")?;
+    let mut proxy = Proxy::new(
+        args.vm_fd as RawFd,
+        args.vm_mac_address,
+        args.vm_net_type,
+        PrefixSet::from_iter(args.allow),
+    )
+    .context("failed to initialize proxy")?;
 
     // Drop effective privileges to the user
     // and group which have had invoked us

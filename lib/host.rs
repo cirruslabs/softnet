@@ -1,5 +1,5 @@
-use clap::ArgEnum;
 use anyhow::{anyhow, Context, Result};
+use clap::ArgEnum;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
@@ -46,15 +46,23 @@ impl Host {
         .context("failed to initialize vmnet interface")?;
 
         // Retrieve first IP (gateway) used for this interface
-        let Some(Parameter::StartAddress(gateway_ip)) = interface.parameters().get(ParameterKind::StartAddress) else {
-            return Err(anyhow!("failed to retrieve vmnet's interface start address"));
+        let Some(Parameter::StartAddress(gateway_ip)) =
+            interface.parameters().get(ParameterKind::StartAddress)
+        else {
+            return Err(anyhow!(
+                "failed to retrieve vmnet's interface start address"
+            ));
         };
         let gateway_ip = Ipv4Addr::from_str(&gateway_ip)
             .context("failed to parse vmnet's interface start address")?;
 
         // Retrieve max packet size for this interface
-        let Some(Parameter::MaxPacketSize(max_packet_size)) = interface.parameters().get(ParameterKind::MaxPacketSize) else {
-            return Err(anyhow!("failed to retrieve vmnet's interface max packet size"));
+        let Some(Parameter::MaxPacketSize(max_packet_size)) =
+            interface.parameters().get(ParameterKind::MaxPacketSize)
+        else {
+            return Err(anyhow!(
+                "failed to retrieve vmnet's interface max packet size"
+            ));
         };
 
         // Set up a socketpair() to emulate polling of the vmnet interface
