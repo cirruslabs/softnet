@@ -51,6 +51,7 @@ struct Args {
     #[clap(
         long,
         help = "comma-separated list of CIDRs to allow the traffic to (e.g. --allow=192.168.0.0/24)",
+        value_name = "comma-separated CIDRs",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
