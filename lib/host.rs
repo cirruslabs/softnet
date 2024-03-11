@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use clap::ArgEnum;
+use clap::ValueEnum;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
@@ -9,7 +9,7 @@ use vmnet::mode::Mode;
 use vmnet::parameters::{Parameter, ParameterKind};
 use vmnet::{Events, Options};
 
-#[derive(ArgEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug)]
 pub enum NetType {
     /// Shared network
     ///
