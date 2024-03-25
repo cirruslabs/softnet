@@ -74,7 +74,9 @@ impl Host {
         interface
             .set_event_callback(Events::PACKETS_AVAILABLE, move |_mask, _params| {
                 // Send a dummy datagram to make the other end of socketpair() readable
-                new_packets_tx.send(&[0; 1]).unwrap();
+                // and ignore the error as this merely a signalling channel to wake up
+                // the poller
+                new_packets_tx.send(&[0; 1]).ok();
 
                 // Wait for the permission to continue to avoid
                 // wasting CPU cycles or in case of termination,
