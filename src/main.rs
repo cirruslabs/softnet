@@ -57,6 +57,12 @@ struct Args {
     )]
     allow: Vec<Ipv4Net>,
 
+    #[clap(
+        long,
+        help = "disable network interface isolation to enable communication between VMs"
+    )]
+    disable_isolation: bool,
+
     #[clap(long, hide = true)]
     sudo_escalation_probing: bool,
 
@@ -161,6 +167,7 @@ fn try_main() -> anyhow::Result<()> {
         args.vm_mac_address,
         args.vm_net_type,
         PrefixSet::from_iter(args.allow),
+        !args.disable_isolation,
     )
     .context("failed to initialize proxy")?;
 

@@ -31,9 +31,10 @@ impl Proxy {
         vm_mac_address: MacAddress,
         vm_net_type: NetType,
         allow: PrefixSet<Ipv4Net>,
+        enable_isolation: bool,
     ) -> Result<Proxy> {
         let vm = VM::new(vm_fd)?;
-        let host = Host::new(vm_net_type)?;
+        let host = Host::new(vm_net_type, enable_isolation)?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
 
         Ok(Proxy {
