@@ -8,7 +8,7 @@ Please check out [this blog post](https://cirrus-ci.org/blog/2022/07/07/isolatin
 Softnet solves two problems:
 
 1. VM network isolation
-  * [`VZNATNetworkDeviceAttachment`](https://developer.apple.com/documentation/virtualization/vznatnetworkdeviceattachment) (the default networking in Tart) enables [vmnet's bridge isolation](https://developer.apple.com/documentation/vmnet/vmnet_enable_isolation_key) by default and prevents cross-VM traffic, however it's still possible for any VM to spoof the host's ARP-table and capture other VMs traffic
+  * [`VZNATNetworkDeviceAttachment`](https://developer.apple.com/documentation/virtualization/vznatnetworkdeviceattachment) (the default networking in Tart) enables [vmnet's bridge isolation](https://developer.apple.com/documentation/vmnet/vmnet_enable_isolation_key) by default and prevents cross-VM traffic, however it's still possible for any VM to spoof the host's ARP-table and capture other VMs traffic by using tools that enable conducting the [ARP spoofing attacks](https://en.wikipedia.org/wiki/ARP_spoofing) (e.g. [arpspoof](https://www.monkey.org/~dugsong/dsniff/),  [arpoison](http://www.arpoison.net/) and so on)
 2. DHCP exhaustion
   * macOS built-in DHCP-server allocates a `/24` subnet with 86400 seconds lease time by default, which only allows for ~253 VMs a day (or 1 VM every ~6 minutes) to be spawned without causing a denial-of-service, which is pretty limiting for CI services like Cirrus CI
 
