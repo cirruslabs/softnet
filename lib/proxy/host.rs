@@ -3,7 +3,7 @@ use crate::proxy::Proxy;
 use anyhow::{Context, Result};
 use smoltcp::wire::{EthernetFrame, EthernetProtocol, Ipv4Packet, UdpPacket};
 
-impl Proxy {
+impl Proxy<'_> {
     pub(crate) fn process_frame_from_host(&mut self, frame: &EthernetFrame<&[u8]>) -> Result<()> {
         if self.allowed_from_host(frame).is_none() {
             // Block packet by not forwarding it to the VM
@@ -58,7 +58,7 @@ impl Proxy {
             return;
         }
 
-        if ipv4_pkt.protocol() != smoltcp::wire::IpProtocol::Udp {
+        if ipv4_pkt.next_header() != smoltcp::wire::IpProtocol::Udp {
             return;
         }
 

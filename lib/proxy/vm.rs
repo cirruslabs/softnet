@@ -8,7 +8,7 @@ use smoltcp::wire::{
 };
 use std::net::Ipv4Addr;
 
-impl Proxy {
+impl Proxy<'_> {
     pub(crate) fn process_frame_from_vm(&mut self, frame: EthernetFrame<&[u8]>) -> Result<()> {
         if self.allowed_from_vm(&frame).is_none() {
             // Block packet by not forwarding it to the host
@@ -86,7 +86,7 @@ impl Proxy {
             return Some(());
         }
 
-        if ipv4_pkt.protocol() == IpProtocol::Udp {
+        if ipv4_pkt.next_header() == IpProtocol::Udp {
             let udp_pkt = UdpPacket::new_checked(ipv4_pkt.payload()).ok()?;
 
             // Allow DNS communication with the DNS-servers provided by DHCP
