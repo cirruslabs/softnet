@@ -31,7 +31,7 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn new(vm_net_type: NetType) -> Result<Host> {
+    pub fn new(vm_net_type: NetType, enable_isolation: bool) -> Result<Host> {
         // Initialize a vmnet.framework NAT or Host interface with isolation enabled
         let mut interface = vmnet::Interface::new(
             match vm_net_type {
@@ -39,7 +39,7 @@ impl Host {
                 NetType::Host => Mode::Host(Default::default()),
             },
             Options {
-                enable_isolation: Some(true),
+                enable_isolation: Some(enable_isolation),
                 ..Default::default()
             },
         )

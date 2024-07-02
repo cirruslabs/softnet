@@ -10,7 +10,7 @@ use crate::vm::VM;
 use anyhow::Result;
 use ipnet::Ipv4Net;
 use mac_address::MacAddress;
-use prefix_trie::PrefixSet;
+use prefix_trie::{Prefix, PrefixSet};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -33,7 +33,7 @@ impl Proxy {
         allow: PrefixSet<Ipv4Net>,
     ) -> Result<Proxy> {
         let vm = VM::new(vm_fd)?;
-        let host = Host::new(vm_net_type)?;
+        let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
 
         Ok(Proxy {

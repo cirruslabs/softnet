@@ -72,7 +72,11 @@ impl Proxy {
             // Also allow all traffic to the user-specified CIDRs
             let dst_net = Ipv4Net::from(dst_addr);
 
-            if self.allow.get_spm(&dst_net).is_some() {
+            // Use get_lpm() instead of get_spm() to work around prefix-trie
+            // not handling prefixes like 0.0.0.0/0 correctly[1]
+            //
+            // [1]: https://github.com/tiborschneider/prefix-trie/issues/8
+            if self.allow.get_lpm(&dst_net).is_some() {
                 return Some(());
             }
         }
