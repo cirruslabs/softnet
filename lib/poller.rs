@@ -2,14 +2,15 @@ use anyhow::Result;
 use num_enum::IntoPrimitive;
 use polling::os::kqueue::PollerKqueueExt;
 use polling::PollMode;
+use std::os::fd::{AsRawFd, BorrowedFd};
 use std::os::unix::io::RawFd;
 use std::time::Duration;
 
-pub struct Poller {
+pub struct Poller<'poller> {
     poller: polling::Poller,
-    events: Vec<polling::Event>,
-    vm_fd: RawFd,
-    host_fd: RawFd,
+    events: polling::Events,
+    vm_fd: BorrowedFd<'poller>,
+    host_fd: BorrowedFd<'poller>,
 }
 
 #[derive(IntoPrimitive)]
@@ -20,22 +21,25 @@ enum EventKey {
     Interrupt,
 }
 
-impl Poller {
-    pub fn new(vm_fd: RawFd, host_fd: RawFd) -> Result<Poller> {
+impl Poller<'_> {
+    pub fn new<'poller>(vm_fd: RawFd, host_fd: RawFd) -> Result<Poller<'poller>> {
         let poller = polling::Poller::new()?;
 
         Ok(Poller {
             poller,
-            events: Vec::new(),
-            vm_fd,
-            host_fd,
+            events: polling::Events::new(),
+            vm_fd: unsafe { BorrowedFd::borrow_raw(vm_fd) },
+            host_fd: unsafe { BorrowedFd::borrow_raw(host_fd) },
         })
     }
 
     pub fn arm(&self) -> Result<()> {
-        self.poller.add(self.vm_fd as RawFd, self.vm_interest())?;
-        self.poller
-            .add(self.host_fd as RawFd, self.host_interest())?;
+        unsafe {
+            self.poller
+                .add(self.vm_fd.as_raw_fd(), self.vm_interest())?;
+            self.poller
+                .add(self.host_fd.as_raw_fd(), self.host_interest())?;
+        }
 
         let interrupt_signal = polling::os::kqueue::Signal(libc::SIGINT);
         self.poller
@@ -52,10 +56,8 @@ impl Poller {
     pub fn rearm(&mut self) -> Result<()> {
         self.events.clear();
 
-        self.poller
-            .modify(self.vm_fd as RawFd, self.vm_interest())?;
-        self.poller
-            .modify(self.host_fd as RawFd, self.host_interest())?;
+        self.poller.modify(self.vm_fd, self.vm_interest())?;
+        self.poller.modify(self.host_fd, self.host_interest())?;
 
         let interrupt_signal = polling::os::kqueue::Signal(libc::SIGINT);
         self.poller.modify_filter(
