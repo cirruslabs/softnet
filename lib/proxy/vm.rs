@@ -48,7 +48,7 @@ impl Proxy<'_> {
         let source_protocol_addr = Ipv4Addr::from(source_protocol_addr);
 
         if let Some(lease) = self.dhcp_snooper.lease() {
-            if lease.valid_ip_source(source_protocol_addr.into()) {
+            if lease.valid_ip_source(source_protocol_addr) {
                 return Some(());
             }
         } else if source_protocol_addr.is_unspecified() {
@@ -62,7 +62,7 @@ impl Proxy<'_> {
         // Have we learned the VM's IP from the DHCP snooping?
         if let Some(lease) = &self.dhcp_snooper.lease() {
             // If so, allow all global traffic
-            let dst_addr = Ipv4Addr::from(ipv4_pkt.dst_addr().0);
+            let dst_addr = ipv4_pkt.dst_addr();
             let dst_is_global = ip_network::IpNetwork::from(dst_addr).is_global();
 
             if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global {
