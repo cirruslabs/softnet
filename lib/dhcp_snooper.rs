@@ -26,14 +26,14 @@ impl DhcpSnooper {
                 };
 
                 let dns_ips = match message.opts().get(OptionCode::DomainNameServer) {
-                    Some(DhcpOption::DomainNameServer(dns_ips)) => HashSet::from_iter(
-                        dns_ips.iter().map(|dns_ip| Ipv4Address(dns_ip.octets())),
-                    ),
+                    Some(DhcpOption::DomainNameServer(dns_ips)) => {
+                        HashSet::from_iter(dns_ips.iter().cloned())
+                    }
                     _ => HashSet::new(),
                 };
 
                 self.vm_lease = Some(Lease::new(
-                    message.yiaddr().into(),
+                    message.yiaddr(),
                     Duration::from_secs(*lease_time as u64),
                     dns_ips,
                 ))

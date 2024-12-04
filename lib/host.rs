@@ -92,7 +92,7 @@ impl Host {
             interface,
             new_packets_rx,
             callback_can_continue_tx,
-            gateway_ip: gateway_ip.into(),
+            gateway_ip,
             max_packet_size,
             finalized: false,
         })
