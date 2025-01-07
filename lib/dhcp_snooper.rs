@@ -73,7 +73,15 @@ impl Lease {
         }
     }
 
+    pub fn address(&self) -> Ipv4Address {
+        self.address
+    }
+
+    pub fn valid(&self) -> bool {
+        Instant::now() < self.valid_until
+    }
+
     pub fn valid_ip_source(&self, address: Ipv4Address) -> bool {
-        self.address == address && Instant::now() < self.valid_until
+        self.address == address && self.valid()
     }
 }

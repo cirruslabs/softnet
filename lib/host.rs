@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use clap::ValueEnum;
+use log::info;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
@@ -7,6 +8,7 @@ use std::str::FromStr;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use vmnet::mode::Mode;
 use vmnet::parameters::{Parameter, ParameterKind};
+use vmnet::port_forwarding::{AddressFamily, Protocol};
 use vmnet::{Events, Options};
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -100,6 +102,35 @@ impl Host {
 }
 
 impl Host {
+    pub fn port_forwarding_add_rule(
+        &mut self,
+        external_port: u16,
+        internal_addr: Ipv4Addr,
+        internal_port: u16,
+    ) -> Result<()> {
+        let details = format!("external_port={external_port}, internal_addr={internal_addr}, internal_port={internal_port}");
+
+        self.interface
+            .port_forwarding_rule_add(
+                AddressFamily::Ipv4,
+                Protocol::Tcp,
+                external_port,
+                internal_addr.into(),
+                internal_port,
+            )
+            .map(|_| info!("added port forwarding rule {details}"))
+            .map_err(|err| anyhow!("failed to add port forwarding rule {details}: {err}"))
+    }
+
+    pub fn port_forwarding_remove_rule(&mut self, external_port: u16) -> Result<()> {
+        let details = format!("external_port={external_port}");
+
+        self.interface
+            .port_forwarding_rule_remove(AddressFamily::Ipv4, Protocol::Tcp, external_port)
+            .map(|_| info!("removed port forwarding rule {details}"))
+            .map_err(|err| anyhow!("failed to remove port forwarding rule {details}: {err}"))
+    }
+
     pub fn read(&mut self, buf: &mut [u8]) -> vmnet::Result<usize> {
         // Dequeue dummy datagram from the socket (if any)
         // to free up buffer space and reduce false-positives

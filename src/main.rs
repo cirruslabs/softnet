@@ -1,14 +1,16 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use ipnet::Ipv4Net;
+use log::LevelFilter;
 use nix::sys::signal::{signal, SigHandler, Signal};
+use oslog::OsLogger;
 use prefix_trie::PrefixSet;
 use privdrop::PrivDrop;
+use softnet::proxy::ExposedPort;
 use softnet::proxy::Proxy;
 use softnet::NetType;
 use std::borrow::Cow;
 use std::env;
-
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
@@ -57,6 +59,15 @@ struct Args {
     )]
     allow: Vec<Ipv4Net>,
 
+    #[clap(
+        long,
+        help = "comma-separated list of TCP ports to expose (e.g. --expose 2222:22,8080:80)",
+        value_name = "comma-separated port specifications",
+        use_value_delimiter = true,
+        action = clap::ArgAction::Set
+    )]
+    expose: Vec<ExposedPort>,
+
     #[clap(long, hide = true)]
     sudo_escalation_probing: bool,
 
@@ -101,6 +112,11 @@ fn main() -> ExitCode {
 }
 
 fn try_main() -> anyhow::Result<()> {
+    // Initialize logger
+    OsLogger::new("org.cirruslabs.softnet")
+        .level_filter(LevelFilter::Info)
+        .init()?;
+
     // The default signal(3)[1] action for SIGINT is to interrupt program,
     // but we want to handle SIGINT ourselves, so we ignore it. The kqueue(2)'s[2]
     // EVFILT_SIGNAL will receive it anyways, because it has lower precedence.
@@ -161,6 +177,7 @@ fn try_main() -> anyhow::Result<()> {
         args.vm_mac_address,
         args.vm_net_type,
         PrefixSet::from_iter(args.allow),
+        args.expose,
     )
     .context("failed to initialize proxy")?;
 
