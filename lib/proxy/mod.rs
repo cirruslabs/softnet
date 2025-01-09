@@ -1,4 +1,6 @@
+mod exposed_port;
 mod host;
+mod port_forwarder;
 mod udp_packet_helper;
 mod vm;
 
@@ -8,8 +10,10 @@ use crate::host::NetType;
 use crate::poller::Poller;
 use crate::vm::VM;
 use anyhow::Result;
+pub use exposed_port::ExposedPort;
 use ipnet::Ipv4Net;
 use mac_address::MacAddress;
+use port_forwarder::PortForwarder;
 use prefix_trie::{Prefix, PrefixSet};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
@@ -23,6 +27,7 @@ pub struct Proxy<'proxy> {
     dhcp_snooper: DhcpSnooper,
     allow: PrefixSet<Ipv4Net>,
     enobufs_encountered: bool,
+    port_forwarder: PortForwarder,
 }
 
 impl Proxy<'_> {
@@ -31,6 +36,7 @@ impl Proxy<'_> {
         vm_mac_address: MacAddress,
         vm_net_type: NetType,
         allow: PrefixSet<Ipv4Net>,
+        exposed_ports: Vec<ExposedPort>,
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
@@ -44,6 +50,7 @@ impl Proxy<'_> {
             dhcp_snooper: Default::default(),
             allow,
             enobufs_encountered: false,
+            port_forwarder: PortForwarder::new(exposed_ports),
         })
     }
 
@@ -66,6 +73,12 @@ impl Proxy<'_> {
             // Graceful termination
             if interrupt {
                 return Ok(());
+            }
+
+            // Timeout
+            if !vm_readable && !host_readable && !interrupt {
+                self.port_forwarder
+                    .tick(&mut self.host, self.dhcp_snooper.lease());
             }
 
             self.poller.rearm()?;
