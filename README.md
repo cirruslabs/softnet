@@ -1,6 +1,17 @@
 # Softnet
 
 Softnet is a software networking for [Tart](https://github.com/cirruslabs/tart) which provides better network isolation and alleviates DHCP shortage on production systems.
+
+It is essentially a userspace packet filter which restricts the VM networking and prevents a class of security issues, such as ARP spoofing. By default, the VM will only be able to:
+
+* send traffic from its own MAC-address
+* send traffic from the IP-address assigned to it by the DHCP
+* send traffic to globally routable IPv4 addresses
+* send traffic to gateway IP of the vmnet bridge (this would normally be \"bridge100\" interface)
+* receive any incoming traffic
+
+In addition, Softnet tunes macOS built-in DHCP server to decrease its lease time from the default 86,400 seconds (one day) to 600 seconds (10 minutes). This is especially important when you use Tart to clone and run a lot of ephemeral VMs over a period of one day.
+
 Please check out [this blog post](https://cirrus-ci.org/blog/2022/07/07/isolating-network-between-tarts-macos-virtual-machines/) for backstory.
 
 ## Working model
