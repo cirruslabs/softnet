@@ -7,6 +7,7 @@ task:
     image: ghcr.io/cirruslabs/macos-sonoma-xcode:latest
   install_rust_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - rustup toolchain install nightly-aarch64-apple-darwin
     - rustup target add x86_64-apple-darwin
   build_script:
     - cargo build --target aarch64-apple-darwin --target x86_64-apple-darwin
@@ -24,6 +25,7 @@ task:
     SENTRY_AUTH_TOKEN: ENCRYPTED[!c16a5cf7da5f856b4bc2f21fe8cb7aa2a6c981f851c094ed4d3025fd02ea59a58a86cee8b193a69a1fc20fa217e56ac3!]
   install_rust_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - rustup toolchain install nightly-aarch64-apple-darwin
     - rustup target add x86_64-apple-darwin
   install_script:
     - brew install go goreleaser/tap/goreleaser-pro getsentry/tools/sentry-cli
