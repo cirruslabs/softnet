@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Error};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct ExposedPort {
     pub external_port: u16,
     pub internal_port: u16,
