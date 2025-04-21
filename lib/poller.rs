@@ -35,38 +35,27 @@ impl Poller<'_> {
 
     pub fn arm(&self) -> Result<()> {
         unsafe {
-            self.poller
-                .add(self.vm_fd.as_raw_fd(), self.vm_interest())?;
-            self.poller
-                .add(self.host_fd.as_raw_fd(), self.host_interest())?;
+            self.poller.add_with_mode(
+                self.vm_fd.as_raw_fd(),
+                self.vm_interest(),
+                PollMode::Edge,
+            )?;
+            self.poller.add_with_mode(
+                self.host_fd.as_raw_fd(),
+                self.host_interest(),
+                PollMode::Edge,
+            )?;
         }
 
         let interrupt_signal = polling::os::kqueue::Signal(libc::SIGINT);
         self.poller
-            .add_filter(
-                interrupt_signal,
-                EventKey::Interrupt.into(),
-                PollMode::Oneshot,
-            )
-            .unwrap();
+            .add_filter(interrupt_signal, EventKey::Interrupt.into(), PollMode::Edge)?;
 
         Ok(())
     }
 
-    pub fn rearm(&mut self) -> Result<()> {
+    pub fn rearm(&mut self) {
         self.events.clear();
-
-        self.poller.modify(self.vm_fd, self.vm_interest())?;
-        self.poller.modify(self.host_fd, self.host_interest())?;
-
-        let interrupt_signal = polling::os::kqueue::Signal(libc::SIGINT);
-        self.poller.modify_filter(
-            interrupt_signal,
-            EventKey::Interrupt.into(),
-            PollMode::Oneshot,
-        )?;
-
-        Ok(())
     }
 
     pub fn wait(&mut self) -> Result<(bool, bool, bool)> {

@@ -81,7 +81,7 @@ impl Proxy<'_> {
                     .tick(&mut self.host, self.dhcp_snooper.lease());
             }
 
-            self.poller.rearm()?;
+            self.poller.rearm();
         }
     }
 
