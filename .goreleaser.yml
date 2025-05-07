@@ -1,26 +1,27 @@
+---
+version: 2
 project_name: softnet
 
 builds:
-  - id: softnet
-    builder: prebuilt
-    goamd64: [v1]
-    goos:
-      - darwin
-    goarch:
-      - arm64
-      - amd64
-    prebuilt:
-      path: 'target/{{- if eq .Arch "arm64" }}aarch64{{- else }}x86_64{{ end }}-apple-darwin/release-with-debug/softnet'
+  - builder: rust
+    command: build
+    targets:
+      - aarch64-apple-darwin
+      - x86_64-apple-darwin
+
+universal_binaries:
+  - replace: true
 
 archives:
-  - id: regular
-    name_template: "{{ .ProjectName }}-{{ .Arch }}"
+  - name_template: "{{ .ProjectName }}"
+    formats:
+      - tar.gz
 
 release:
   prerelease: auto
 
 brews:
-  - name: softnet
+  - name: "{{ .ProjectName }}"
     repository:
       owner: cirruslabs
       name: homebrew-cli
