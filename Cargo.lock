@@ -363,9 +363,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "clap"
-version = "4.5.45"
+version = "4.5.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc0e74a703892159f5ae7d3aac52c8e6c392f5ae5f359c70b5881d60aaac318"
+checksum = "2c5e4fcf9c21d2e544ca1ee9d8552de13019a42aa7dbf32747fa7aaf1df76e57"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -373,9 +373,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.44"
+version = "4.5.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e7f4214277f3c7aa526a59dd3fbe306a370daee1f8b7b8c987069cd8e888a8"
+checksum = "fecb53a0e6fcfb055f686001bc2e2592fa527efaf38dbe81a6a9563562e57d41"
 dependencies = [
  "anstream",
  "anstyle",
@@ -601,8 +601,8 @@ dependencies = [
 
 [[package]]
 name = "dhcproto"
-version = "0.13.0"
-source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#073e2588b50326654f68b6141b378a1e5d60781c"
+version = "0.14.0"
+source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#96a6845f7154a54e9c18d3595807c62e7994d5fe"
 dependencies = [
  "dhcproto-macros",
  "hex",
@@ -616,9 +616,11 @@ dependencies = [
 [[package]]
 name = "dhcproto-macros"
 version = "0.1.0"
-source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#073e2588b50326654f68b6141b378a1e5d60781c"
+source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#96a6845f7154a54e9c18d3595807c62e7994d5fe"
 dependencies = [
  "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
