@@ -31,7 +31,7 @@ nix = { version = "0", features = ["signal"] }
 prefix-trie = "0"
 ipnet = "2"
 oslog = "0.2.0"
-log = "0.4.27"
+log = "0.4.28"
 
 [profile.release]
 debug = true
