@@ -61,6 +61,12 @@ struct Args {
 
     #[clap(
         long,
+        help = "if specified, only allow traffic to the CIDRs passed via --allow (besides host/DHCP/DNS)"
+    )]
+    allow_only: bool,
+
+    #[clap(
+        long,
         help = "comma-separated list of TCP ports to expose (e.g. --expose 2222:22,8080:80)",
         value_name = "comma-separated port specifications",
         use_value_delimiter = true,
@@ -171,12 +177,19 @@ fn try_main() -> anyhow::Result<()> {
     // Set bootpd(8) min/max lease time while still having the root privileges
     set_bootpd_lease_time(args.bootpd_lease_time);
 
+    if args.allow_only && args.allow.is_empty() {
+        return Err(anyhow!(
+            "--allow-only requires at least one CIDR supplied via --allow"
+        ));
+    }
+
     // Initialize the proxy while still having the root privileges
     let mut proxy = Proxy::new(
         args.vm_fd as RawFd,
         args.vm_mac_address,
         args.vm_net_type,
         PrefixSet::from_iter(args.allow),
+        args.allow_only,
         args.expose,
     )
     .context("failed to initialize proxy")?;

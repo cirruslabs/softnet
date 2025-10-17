@@ -26,6 +26,7 @@ pub struct Proxy<'proxy> {
     vm_mac_address: smoltcp::wire::EthernetAddress,
     dhcp_snooper: DhcpSnooper,
     allow: PrefixSet<Ipv4Net>,
+    allow_only: bool,
     enobufs_encountered: bool,
     port_forwarder: PortForwarder,
 }
@@ -36,10 +37,17 @@ impl Proxy<'_> {
         vm_mac_address: MacAddress,
         vm_net_type: NetType,
         allow: PrefixSet<Ipv4Net>,
+        allow_only: bool,
         exposed_ports: Vec<ExposedPort>,
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
-        let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
+        let enable_isolation = if allow_only {
+            true
+        } else {
+            !allow.contains(&Ipv4Net::zero())
+        };
+
+        let host = Host::new(vm_net_type, enable_isolation)?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
 
         Ok(Proxy {
@@ -49,6 +57,7 @@ impl Proxy<'_> {
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
             dhcp_snooper: Default::default(),
             allow,
+            allow_only,
             enobufs_encountered: false,
             port_forwarder: PortForwarder::new(exposed_ports),
         })
