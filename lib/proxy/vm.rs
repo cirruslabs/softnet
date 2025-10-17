@@ -61,22 +61,24 @@ impl Proxy<'_> {
     fn allowed_from_vm_ipv4(&self, ipv4_pkt: Ipv4Packet<&[u8]>) -> Option<()> {
         // Have we learned the VM's IP from the DHCP snooping?
         if let Some(lease) = &self.dhcp_snooper.lease() {
-            // If so, allow all global traffic
             let dst_addr = ipv4_pkt.dst_addr();
-            let dst_is_global = ip_network::IpNetwork::from(dst_addr).is_global();
 
-            if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global {
-                return Some(());
-            }
-
-            // Also allow all traffic to the user-specified CIDRs
+            // Allow traffic explicitly permitted by the user-specified CIDRs
             let dst_net = Ipv4Net::from(dst_addr);
 
             // Use get_lpm() instead of get_spm() to work around prefix-trie
             // not handling prefixes like 0.0.0.0/0 correctly[1]
             //
             // [1]: https://github.com/tiborschneider/prefix-trie/issues/8
-            if self.allow.get_lpm(&dst_net).is_some() {
+            if lease.valid_ip_source(ipv4_pkt.src_addr()) && self.allow.get_lpm(&dst_net).is_some()
+            {
+                return Some(());
+            }
+
+            if !self.allow_only
+                && lease.valid_ip_source(ipv4_pkt.src_addr())
+                && ip_network::IpNetwork::from(dst_addr).is_global()
+            {
                 return Some(());
             }
         }

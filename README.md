@@ -10,6 +10,10 @@ It is essentially a userspace packet filter which restricts the VM networking an
 * send traffic to gateway IP of the vmnet bridge (this would normally be \"bridge100\" interface)
 * receive any incoming traffic
 
+You can widen access to additional private ranges by passing a comma-separated list of CIDRs via `--allow`.
+
+If you'd like to treat `--allow` as a strict whitelist, add `--allow-only`. With that flag, the VM can only reach the CIDRs you specified (plus the inevitable DHCP/DNS traffic and the host gateway needed for connectivity).
+
 In addition, Softnet tunes macOS built-in DHCP server to decrease its lease time from the default 86,400 seconds (one day) to 600 seconds (10 minutes). This is especially important when you use Tart to clone and run a lot of ephemeral VMs over a period of one day.
 
 Please check out [this blog post](https://cirrus-ci.org/blog/2022/07/07/isolating-network-between-tarts-macos-virtual-machines/) for backstory.
