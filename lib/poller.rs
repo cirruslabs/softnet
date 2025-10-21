@@ -1,7 +1,7 @@
 use anyhow::Result;
 use num_enum::IntoPrimitive;
-use polling::os::kqueue::PollerKqueueExt;
 use polling::PollMode;
+use polling::os::kqueue::PollerKqueueExt;
 use std::os::fd::{AsRawFd, BorrowedFd};
 use std::os::unix::io::RawFd;
 use std::time::Duration;

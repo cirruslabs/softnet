@@ -14,7 +14,7 @@ pub use exposed_port::ExposedPort;
 use ipnet::Ipv4Net;
 use mac_address::MacAddress;
 use port_forwarder::PortForwarder;
-use prefix_trie::{Prefix, PrefixSet};
+use prefix_trie::{Prefix, PrefixMap, PrefixSet};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -25,9 +25,15 @@ pub struct Proxy<'proxy> {
     poller: Poller<'proxy>,
     vm_mac_address: smoltcp::wire::EthernetAddress,
     dhcp_snooper: DhcpSnooper,
-    allow: PrefixSet<Ipv4Net>,
+    rules: PrefixMap<Ipv4Net, Action>,
     enobufs_encountered: bool,
     port_forwarder: PortForwarder,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Action {
+    Block,
+    Allow,
 }
 
 impl Proxy<'_> {
@@ -36,11 +42,26 @@ impl Proxy<'_> {
         vm_mac_address: MacAddress,
         vm_net_type: NetType,
         allow: PrefixSet<Ipv4Net>,
+        block: PrefixSet<Ipv4Net>,
         exposed_ports: Vec<ExposedPort>,
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
+
+        // Craft packet filter rules
+        //
+        // SECURITY: blocking rules must always take precedence
+        // over allowing rules when prefixes are identical.
+        let mut rules = PrefixMap::new();
+
+        for allow_net in allow {
+            rules.insert(allow_net, Action::Allow);
+        }
+
+        for block_net in block {
+            rules.insert(block_net, Action::Block);
+        }
 
         Ok(Proxy {
             vm,
@@ -48,7 +69,7 @@ impl Proxy<'_> {
             poller,
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
             dhcp_snooper: Default::default(),
-            allow,
+            rules,
             enobufs_encountered: false,
             port_forwarder: PortForwarder::new(exposed_ports),
         })
@@ -121,5 +142,107 @@ impl Proxy<'_> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::NetType;
+    use crate::dhcp_snooper::Lease;
+    use crate::proxy::{Action, Proxy};
+    use ipnet::Ipv4Net;
+    use mac_address::MacAddress;
+    use nix::sys::socket::{AddressFamily, SockFlag, SockType, socketpair};
+    use prefix_trie::{PrefixMap, PrefixSet};
+    use serial_test::serial;
+    use smoltcp::wire::{Ipv4Address, Ipv4Packet};
+    use std::collections::HashSet;
+    use std::os::fd::AsRawFd;
+    use std::str::FromStr;
+    use std::time::Duration;
+
+    #[test]
+    #[serial]
+    fn test_blocking_takes_precedence() {
+        let vm_ip = Ipv4Address::from_str("192.168.0.2").unwrap();
+        let proxy = create_proxy(vm_ip, vec!["66.66.0.0/16"], vec!["66.66.0.0/16"]);
+
+        assert_eq!(
+            proxy.rules,
+            PrefixMap::<Ipv4Net, Action>::from_iter(vec![(
+                Ipv4Net::from_str("66.66.0.0/16").unwrap(),
+                Action::Block
+            ),])
+        );
+
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "66.66.66.66").is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn test_longest_prefix_match_wins() {
+        let vm_ip = Ipv4Address::from_str("192.168.0.2").unwrap();
+        let proxy = create_proxy(vm_ip, vec!["33.33.33.33/32"], vec!["33.33.33.0/24"]);
+
+        assert_eq!(
+            proxy.rules,
+            PrefixMap::<Ipv4Net, Action>::from_iter(vec![
+                (Ipv4Net::from_str("33.33.33.33/32").unwrap(), Action::Allow),
+                (Ipv4Net::from_str("33.33.33.0/24").unwrap(), Action::Block),
+            ])
+        );
+
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.32").is_none());
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.33").is_some());
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.34").is_none());
+    }
+
+    fn create_proxy<'test>(vm_ip: Ipv4Address, allow: Vec<&str>, block: Vec<&str>) -> Proxy<'test> {
+        let (vm_fd, _) = socketpair(
+            AddressFamily::Unix,
+            SockType::Datagram,
+            None,
+            SockFlag::empty(),
+        )
+        .unwrap();
+        let vm_fd = Box::leak(Box::new(vm_fd));
+
+        let mut proxy = Proxy::new(
+            vm_fd.as_raw_fd(),
+            MacAddress::from_str("02:00:00:00:00:01").unwrap(),
+            NetType::Nat,
+            PrefixSet::from_iter(
+                allow
+                    .into_iter()
+                    .map(|cidr| Ipv4Net::from_str(cidr).unwrap()),
+            ),
+            PrefixSet::from_iter(
+                block
+                    .into_iter()
+                    .map(|cidr| Ipv4Net::from_str(cidr).unwrap()),
+            ),
+            Vec::default(),
+        )
+        .unwrap();
+
+        proxy.dhcp_snooper.set_lease(Some(Lease::new(
+            vm_ip,
+            Duration::from_secs(600),
+            HashSet::new(),
+        )));
+
+        proxy
+    }
+
+    fn allowed_from_vm_ipv4(proxy: &Proxy, src: Ipv4Address, dst: &str) -> Option<()> {
+        let mut buf = vec![0; 1500];
+
+        let mut ipv4_pkt_mut = Ipv4Packet::new_unchecked(&mut buf[..]);
+        ipv4_pkt_mut.set_src_addr(src);
+        ipv4_pkt_mut.set_dst_addr(Ipv4Address::from_str(dst).unwrap());
+
+        let ipv4_pkt = Ipv4Packet::new_unchecked(buf.as_slice());
+
+        proxy.allowed_from_vm_ipv4(ipv4_pkt)
     }
 }

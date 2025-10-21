@@ -1,5 +1,5 @@
-use crate::proxy::udp_packet_helper::UdpPacketHelper;
 use crate::proxy::Proxy;
+use crate::proxy::udp_packet_helper::UdpPacketHelper;
 use anyhow::{Context, Result};
 use smoltcp::wire::{EthernetFrame, EthernetProtocol, Ipv4Packet, UdpPacket};
 
