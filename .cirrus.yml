@@ -1,11 +1,38 @@
+use_compute_credits: true
+
+macos_instance:
+  image: ghcr.io/cirruslabs/macos-runner:tahoe
+
 env:
   PATH: "$PATH:$HOME/.cargo/bin"
 
 task:
+  name: Lint
+  install_rust_script: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  rustfmt_script: cargo fmt --check
+  clippy_script: cargo clippy --all-targets --all-features -- -D warnings
+
+task:
+  alias: Test
+  matrix:
+    - name: Test on macOS Sonoma
+      macos_instance:
+        image: ghcr.io/cirruslabs/macos-runner:sonoma
+    - name: Test on macOS Sequoia
+      macos_instance:
+        image: ghcr.io/cirruslabs/macos-runner:sequoia
+    - name: Test on macOS Tahoe
+      macos_instance:
+        image: ghcr.io/cirruslabs/macos-runner:tahoe
+  install_rust_script: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  test_script: cargo test
+
+task:
   name: Release (Dry Run)
   only_if: $CIRRUS_TAG == ''
-  macos_instance:
-    image: ghcr.io/cirruslabs/macos-sequoia-xcode:latest
+  depends_on:
+    - Lint
+    - Test
   install_rust_script: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   install_script: brew install go
   install_goreleaser_script: brew install --cask goreleaser/tap/goreleaser-pro
@@ -16,8 +43,9 @@ task:
 task:
   name: Release
   only_if: $CIRRUS_TAG != ''
-  macos_instance:
-    image: ghcr.io/cirruslabs/macos-sequoia-xcode:latest
+  depends_on:
+    - Lint
+    - Test
   env:
     GITHUB_TOKEN: ENCRYPTED[!98ace8259c6024da912c14d5a3c5c6aac186890a8d4819fad78f3e0c41a4e0cd3a2537dd6e91493952fb056fa434be7c!]
     GORELEASER_KEY: ENCRYPTED[!9b80b6ef684ceaf40edd4c7af93014ee156c8aba7e6e5795f41c482729887b5c31f36b651491d790f1f668670888d9fd!]

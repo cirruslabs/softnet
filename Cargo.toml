@@ -2,7 +2,7 @@
 name = "softnet"
 version = "0.1.0"
 publish = false
-edition = "2021"
+edition = "2024"
 
 [lib]
 path = "lib/mod.rs"
@@ -27,11 +27,12 @@ system-configuration = "0"
 num_enum = "0"
 sentry = { version = "0", features = ["debug-images"] }
 sentry-anyhow = { version = "0", features = ["backtrace"] }
-nix = { version = "0", features = ["signal"] }
+nix = { version = "0", features = ["signal", "socket"] }
 prefix-trie = "0"
 ipnet = "2"
 oslog = "0.2.0"
 log = "0.4.28"
+serial_test = "0"
 
 [profile.release]
 debug = true

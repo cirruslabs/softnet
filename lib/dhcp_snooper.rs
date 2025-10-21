@@ -1,5 +1,5 @@
-use dhcproto::v4::{DhcpOption, MessageType, OptionCode};
 use dhcproto::Decodable;
+use dhcproto::v4::{DhcpOption, MessageType, OptionCode};
 use smoltcp::wire::Ipv4Address;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
@@ -45,6 +45,11 @@ impl DhcpSnooper {
         };
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_lease(&mut self, vm_lease: Option<Lease>) {
+        self.vm_lease = vm_lease
+    }
+
     pub fn lease(&self) -> &Option<Lease> {
         &self.vm_lease
     }
@@ -58,6 +63,7 @@ impl DhcpSnooper {
     }
 }
 
+#[derive(Debug)]
 pub struct Lease {
     address: Ipv4Address,
     valid_until: Instant,
@@ -65,7 +71,7 @@ pub struct Lease {
 }
 
 impl Lease {
-    fn new(address: Ipv4Address, lease_time: Duration, dns_ips: HashSet<Ipv4Address>) -> Lease {
+    pub fn new(address: Ipv4Address, lease_time: Duration, dns_ips: HashSet<Ipv4Address>) -> Lease {
         Lease {
             address,
             valid_until: Instant::now() + lease_time,

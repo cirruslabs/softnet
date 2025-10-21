@@ -1,5 +1,5 @@
 use crate::proxy::udp_packet_helper::UdpPacketHelper;
-use crate::proxy::Proxy;
+use crate::proxy::{Action, Proxy};
 use anyhow::Context;
 use anyhow::Result;
 use ipnet::Ipv4Net;
@@ -58,42 +58,53 @@ impl Proxy<'_> {
         None
     }
 
-    fn allowed_from_vm_ipv4(&self, ipv4_pkt: Ipv4Packet<&[u8]>) -> Option<()> {
-        // Have we learned the VM's IP from the DHCP snooping?
-        if let Some(lease) = &self.dhcp_snooper.lease() {
-            // If so, allow all global traffic
+    pub(crate) fn allowed_from_vm_ipv4(&self, ipv4_pkt: Ipv4Packet<&[u8]>) -> Option<()> {
+        // Is this packet coming from VM's IP address that we've learned from DHCP snooping?
+        if let Some(lease) = &self.dhcp_snooper.lease()
+            && lease.valid_ip_source(ipv4_pkt.src_addr())
+        {
             let dst_addr = ipv4_pkt.dst_addr();
-            let dst_is_global = ip_network::IpNetwork::from(dst_addr).is_global();
 
-            if lease.valid_ip_source(ipv4_pkt.src_addr()) && dst_is_global {
+            // Filter traffic based on user-specified rules first
+            if !self.rules.is_empty() {
+                let dst_net = Ipv4Net::from(dst_addr);
+
+                if let Some((_, action)) = self.rules.get_lpm(&dst_net) {
+                    return match action {
+                        Action::Allow => Some(()),
+                        Action::Block => None,
+                    };
+                }
+            }
+
+            // When no user-specified rules matched, simply allow all global traffic
+            if ip_network::IpNetwork::from(dst_addr).is_global() {
                 return Some(());
             }
 
-            // Also allow all traffic to the user-specified CIDRs
-            let dst_net = Ipv4Net::from(dst_addr);
-
-            // Use get_lpm() instead of get_spm() to work around prefix-trie
-            // not handling prefixes like 0.0.0.0/0 correctly[1]
-            //
-            // [1]: https://github.com/tiborschneider/prefix-trie/issues/8
-            if self.allow.get_lpm(&dst_net).is_some() {
+            // Additionally, allow communication with the host,
+            // otherwise things like SSH to a VM won't work
+            if ipv4_pkt.dst_addr() == self.host.gateway_ip {
                 return Some(());
+            }
+
+            // Additionally, allow DNS requests to DNS-servers
+            // provided to a VM by the host's DHCP server
+            if ipv4_pkt.next_header() == IpProtocol::Udp {
+                let udp_pkt = UdpPacket::new_checked(ipv4_pkt.payload()).ok()?;
+
+                if udp_pkt.is_dns_request()
+                    && self.dhcp_snooper.valid_dns_target(&ipv4_pkt.dst_addr())
+                {
+                    return Some(());
+                }
             }
         }
 
-        // Allow communication with host
-        if ipv4_pkt.dst_addr() == self.host.gateway_ip {
-            return Some(());
-        }
-
+        // Allow outgoing DHCP requests to broadcast addresses,
+        // otherwise DHCP snooper will never be populated
         if ipv4_pkt.next_header() == IpProtocol::Udp {
             let udp_pkt = UdpPacket::new_checked(ipv4_pkt.payload()).ok()?;
-
-            // Allow DNS communication with the DNS-servers provided by DHCP
-            if udp_pkt.is_dns_request() && self.dhcp_snooper.valid_dns_target(&ipv4_pkt.dst_addr())
-            {
-                return Some(());
-            }
 
             // Allow DHCP communication with the bootpd(8) on host via broadcast address
             if udp_pkt.is_dhcp_request() && ipv4_pkt.dst_addr().is_broadcast() {

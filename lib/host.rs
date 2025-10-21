@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::ValueEnum;
 use log::info;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::os::unix::net::UnixDatagram;
 use std::str::FromStr;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{SyncSender, sync_channel};
 use vmnet::mode::Mode;
 use vmnet::parameters::{Parameter, ParameterKind};
 use vmnet::port_forwarding::{AddressFamily, Protocol};
@@ -108,7 +108,9 @@ impl Host {
         internal_addr: Ipv4Addr,
         internal_port: u16,
     ) -> Result<()> {
-        let details = format!("external_port={external_port}, internal_addr={internal_addr}, internal_port={internal_port}");
+        let details = format!(
+            "external_port={external_port}, internal_addr={internal_addr}, internal_port={internal_port}"
+        );
 
         self.interface
             .port_forwarding_rule_add(

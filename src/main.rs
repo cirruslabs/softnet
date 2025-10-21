@@ -1,14 +1,14 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use clap::Parser;
 use ipnet::Ipv4Net;
 use log::LevelFilter;
-use nix::sys::signal::{signal, SigHandler, Signal};
+use nix::sys::signal::{SigHandler, Signal, signal};
 use oslog::OsLogger;
 use prefix_trie::PrefixSet;
 use privdrop::PrivDrop;
+use softnet::NetType;
 use softnet::proxy::ExposedPort;
 use softnet::proxy::Proxy;
-use softnet::NetType;
 use std::borrow::Cow;
 use std::env;
 use std::os::raw::c_int;
@@ -52,12 +52,30 @@ struct Args {
 
     #[clap(
         long,
-        help = "comma-separated list of CIDRs to allow the traffic to (e.g. --allow=192.168.0.0/24)",
+        help = "Comma-separated list of CIDRs to allow the traffic to \
+        (e.g. --allow=192.168.0.0/24 may be used to allow a LAN access for a VM). \
+        When used with --block, the longest prefix match always wins. \
+        In case an identical prefix is both --allow'ed and --block'ed, \
+        blocking will take precedence. --allow=0.0.0.0/0 is a special case, \
+        it additionally disables bridge isolation (even when --block=0.0.0.0/0 is specified).",
         value_name = "comma-separated CIDRs",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
     allow: Vec<Ipv4Net>,
+
+    #[clap(
+        long,
+        help = "Comma-separated list of CIDRs to block the traffic to \
+        (e.g. --block=0.0.0.0/0 may be used to establish a default deny policy \
+        that is further relaxed with --allow). When used with --allow, \
+        the longest prefix match always wins. In case the same prefix is both \
+        --allow'ed and --block'ed, blocking takes precedence.",
+        value_name = "comma-separated CIDRs",
+        use_value_delimiter = true,
+        action = clap::ArgAction::Set
+    )]
+    block: Vec<Ipv4Net>,
 
     #[clap(
         long,
@@ -78,7 +96,9 @@ struct Args {
 fn main() -> ExitCode {
     // Enable backtraces by default
     if env::var("RUST_BACKTRACE").is_err() {
-        env::set_var("RUST_BACKTRACE", "full");
+        unsafe {
+            env::set_var("RUST_BACKTRACE", "full");
+        }
     }
 
     // Initialize Sentry
@@ -177,6 +197,7 @@ fn try_main() -> anyhow::Result<()> {
         args.vm_mac_address,
         args.vm_net_type,
         PrefixSet::from_iter(args.allow),
+        PrefixSet::from_iter(args.block),
         args.expose,
     )
     .context("failed to initialize proxy")?;
