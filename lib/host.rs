@@ -9,7 +9,7 @@ use std::sync::mpsc::{SyncSender, sync_channel};
 use vmnet::mode::Mode;
 use vmnet::parameters::{Parameter, ParameterKind};
 use vmnet::port_forwarding::{AddressFamily, Protocol};
-use vmnet::{Events, Options};
+use vmnet::{Batch, Events, Options};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum NetType {
@@ -29,6 +29,7 @@ pub struct Host {
     callback_can_continue_tx: SyncSender<()>,
     pub gateway_ip: smoltcp::wire::Ipv4Address,
     pub max_packet_size: u64,
+    pub read_max_packets: u64,
     finalized: bool,
 }
 
@@ -67,6 +68,15 @@ impl Host {
             ));
         };
 
+        // Retrieve read max packets for this interface
+        let Some(Parameter::ReadMaxPackets(read_max_packets)) =
+            interface.parameters().get(ParameterKind::ReadMaxPackets)
+        else {
+            return Err(anyhow!(
+                "failed to retrieve vmnet's interface read max packets"
+            ));
+        };
+
         // Set up a socketpair() to emulate polling of the vmnet interface
         let (new_packets_tx, new_packets_rx) = UnixDatagram::pair()?;
         new_packets_rx.set_nonblocking(true)?;
@@ -96,6 +106,7 @@ impl Host {
             callback_can_continue_tx,
             gateway_ip,
             max_packet_size,
+            read_max_packets,
             finalized: false,
         })
     }
@@ -133,14 +144,14 @@ impl Host {
             .map_err(|err| anyhow!("failed to remove port forwarding rule {details}: {err}"))
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> vmnet::Result<usize> {
+    pub fn read(&mut self, batch: &mut Batch, bufs: &mut [Vec<u8>]) -> vmnet::Result<usize> {
         // Dequeue dummy datagram from the socket (if any)
         // to free up buffer space and reduce false-positives
         // when polling
         let mut buf_to_be_discarded: [u8; 1] = [0; 1];
         let _ = self.new_packets_rx.recv(&mut buf_to_be_discarded);
 
-        let result = self.interface.read(buf);
+        let result = self.interface.read_batch(batch, bufs);
 
         if let Err(vmnet::Error::VmnetReadNothing) = result {
             // We've emptied everything, unlock the callback
