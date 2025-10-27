@@ -15,9 +15,6 @@ task:
 task:
   alias: Test
   matrix:
-    - name: Test on macOS Sonoma
-      macos_instance:
-        image: ghcr.io/cirruslabs/macos-runner:sonoma
     - name: Test on macOS Sequoia
       macos_instance:
         image: ghcr.io/cirruslabs/macos-runner:sequoia
