@@ -18,6 +18,7 @@ use prefix_trie::{Prefix, PrefixMap, PrefixSet};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
+use vmnet::Batch;
 
 pub struct Proxy<'proxy> {
     vm: VM,
@@ -76,7 +77,15 @@ impl Proxy<'_> {
     }
 
     pub fn run(&mut self) -> Result<()> {
+        // Create a single buffer from reading from the VM
         let mut buf: Vec<u8> = vec![0; self.host.max_packet_size as usize];
+
+        // Create multiple buffers and a batch for reading from the host
+        let mut bufs = vec![
+            vec![0u8; self.host.max_packet_size as usize];
+            self.host.read_max_packets as usize
+        ];
+        let mut batch = Batch::preallocate(bufs.len());
 
         self.poller.arm()?;
 
@@ -88,7 +97,7 @@ impl Proxy<'_> {
             }
 
             if host_readable {
-                self.read_from_host(buf.as_mut_slice())?;
+                self.read_from_host(&mut batch, &mut bufs)?;
             }
 
             // Graceful termination
@@ -125,12 +134,14 @@ impl Proxy<'_> {
         }
     }
 
-    fn read_from_host(&mut self, buf: &mut [u8]) -> Result<()> {
+    fn read_from_host(&mut self, batch: &mut Batch, bufs: &mut [Vec<u8>]) -> Result<()> {
         loop {
-            match self.host.read(buf) {
-                Ok(n) => {
-                    if let Ok(pkt) = EthernetFrame::new_checked(&buf[..n]) {
-                        self.process_frame_from_host(&pkt)?;
+            match self.host.read(batch, bufs) {
+                Ok(pktcnt) => {
+                    for buf in batch.packet_sized_bufs(bufs).take(pktcnt) {
+                        if let Ok(pkt) = EthernetFrame::new_checked(buf) {
+                            self.process_frame_from_host(&pkt)?;
+                        }
                     }
                 }
                 Err(err) => {
