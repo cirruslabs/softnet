@@ -1,4 +1,4 @@
-use anyhow::{Context, anyhow};
+use anyhow::{Context, Error, anyhow};
 use clap::Parser;
 use ipnet::Ipv4Net;
 use log::LevelFilter;
@@ -11,10 +11,12 @@ use softnet::proxy::ExposedPort;
 use softnet::proxy::Proxy;
 use std::borrow::Cow;
 use std::env;
+use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::os::raw::c_int;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
 use std::process::{Command, ExitCode};
+use std::str::FromStr;
 use system_configuration::core_foundation::base::TCFType;
 use system_configuration::core_foundation::dictionary::CFDictionary;
 use system_configuration::core_foundation::number::CFNumber;
@@ -22,6 +24,67 @@ use system_configuration::core_foundation::string::CFString;
 use system_configuration::preferences::SCPreferences;
 use system_configuration::sys::preferences::{SCPreferencesCommitChanges, SCPreferencesSetValue};
 use uzers::{get_current_groupname, get_current_username, get_effective_uid};
+
+#[derive(Debug, Clone)]
+enum AllowBlockEntry {
+    Net(Ipv4Net),
+    Domain(String),
+}
+
+impl FromStr for AllowBlockEntry {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            return Err(anyhow!("empty allow/block entry"));
+        }
+
+        if let Ok(net) = trimmed.parse::<Ipv4Net>() {
+            return Ok(AllowBlockEntry::Net(net));
+        }
+
+        if let Ok(addr) = trimmed.parse::<Ipv4Addr>() {
+            return Ok(AllowBlockEntry::Net(Ipv4Net::from(addr)));
+        }
+
+        Ok(AllowBlockEntry::Domain(trimmed.to_string()))
+    }
+}
+
+fn resolve_allow_block_entries(
+    kind: &str,
+    entries: Vec<AllowBlockEntry>,
+) -> anyhow::Result<Vec<Ipv4Net>> {
+    let mut nets = Vec::new();
+
+    for entry in entries {
+        match entry {
+            AllowBlockEntry::Net(net) => nets.push(net),
+            AllowBlockEntry::Domain(domain) => {
+                // A-record resolution happens here via ToSocketAddrs, then we keep only IPv4s.
+                let resolved: Vec<Ipv4Net> = (domain.as_str(), 0)
+                    .to_socket_addrs()
+                    .with_context(|| format!("failed to resolve {kind} entry {domain}"))?
+                    .filter_map(|addr| match addr {
+                        SocketAddr::V4(v4) => Some(Ipv4Net::from(*v4.ip())),
+                        SocketAddr::V6(_) => None,
+                    })
+                    .collect();
+
+                if resolved.is_empty() {
+                    return Err(anyhow!(
+                        "no IPv4 addresses found for {kind} entry {domain}"
+                    ));
+                }
+
+                nets.extend(resolved);
+            }
+        }
+    }
+
+    Ok(nets)
+}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -52,30 +115,32 @@ struct Args {
 
     #[clap(
         long,
-        help = "Comma-separated list of CIDRs to allow the traffic to \
-        (e.g. --allow=192.168.0.0/24 may be used to allow a LAN access for a VM). \
+        help = "Comma-separated list of CIDRs, IPs, or domains to allow the traffic to \
+        (e.g. --allow=192.168.0.0/24 or --allow=example.com). Domains are resolved to A records \
+        at startup. \
         When used with --block, the longest prefix match always wins. \
         In case an identical prefix is both --allow'ed and --block'ed, \
         blocking will take precedence. --allow=0.0.0.0/0 is a special case, \
         it additionally disables bridge isolation (even when --block=0.0.0.0/0 is specified).",
-        value_name = "comma-separated CIDRs",
+        value_name = "comma-separated CIDRs/IPs/domains",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
-    allow: Vec<Ipv4Net>,
+    allow: Vec<AllowBlockEntry>,
 
     #[clap(
         long,
-        help = "Comma-separated list of CIDRs to block the traffic to \
+        help = "Comma-separated list of CIDRs, IPs, or domains to block the traffic to \
         (e.g. --block=0.0.0.0/0 may be used to establish a default deny policy \
-        that is further relaxed with --allow). When used with --allow, \
+        that is further relaxed with --allow). Domains are resolved to A records at startup. \
+        When used with --allow, \
         the longest prefix match always wins. In case the same prefix is both \
         --allow'ed and --block'ed, blocking takes precedence.",
-        value_name = "comma-separated CIDRs",
+        value_name = "comma-separated CIDRs/IPs/domains",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
-    block: Vec<Ipv4Net>,
+    block: Vec<AllowBlockEntry>,
 
     #[clap(
         long,
@@ -145,7 +210,7 @@ fn try_main() -> anyhow::Result<()> {
     // [2]: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kqueue.2.html
     unsafe { signal(Signal::SIGINT, SigHandler::SigIgn) }?;
 
-    let args: Args = Args::parse();
+    let mut args: Args = Args::parse();
 
     // No need to run anything, just return
     // so that the invoker process knows we
@@ -188,6 +253,9 @@ fn try_main() -> anyhow::Result<()> {
         ));
     }
 
+    let allow = resolve_allow_block_entries("allow", std::mem::take(&mut args.allow))?;
+    let block = resolve_allow_block_entries("block", std::mem::take(&mut args.block))?;
+
     // Set bootpd(8) min/max lease time while still having the root privileges
     set_bootpd_lease_time(args.bootpd_lease_time);
 
@@ -196,8 +264,8 @@ fn try_main() -> anyhow::Result<()> {
         args.vm_fd as RawFd,
         args.vm_mac_address,
         args.vm_net_type,
-        PrefixSet::from_iter(args.allow),
-        PrefixSet::from_iter(args.block),
+        PrefixSet::from_iter(allow),
+        PrefixSet::from_iter(block),
         args.expose,
     )
     .context("failed to initialize proxy")?;
@@ -247,5 +315,25 @@ fn set_bootpd_lease_time(lease_time: u32) {
         );
 
         SCPreferencesCommitChanges(prefs.as_concrete_TypeRef());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AllowBlockEntry, resolve_allow_block_entries};
+    use ipnet::Ipv4Net;
+    use std::net::Ipv4Addr;
+
+    #[test]
+    fn resolve_domain_to_ipv4_nets_example_com() {
+        let nets = resolve_allow_block_entries(
+            "allow",
+            vec![AllowBlockEntry::Domain("example.com".to_string())],
+        )
+        .unwrap();
+
+        assert!(nets.contains(&Ipv4Net::from(Ipv4Addr::new(
+            93, 184, 216, 34
+        ))));
     }
 }
