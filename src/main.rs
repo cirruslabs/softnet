@@ -210,12 +210,24 @@ fn try_main() -> anyhow::Result<()> {
     // [2]: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/kqueue.2.html
     unsafe { signal(Signal::SIGINT, SigHandler::SigIgn) }?;
 
-    let mut args: Args = Args::parse();
+    let Args {
+        vm_fd,
+        vm_mac_address,
+        vm_net_type,
+        bootpd_lease_time,
+        user,
+        group,
+        allow,
+        block,
+        expose,
+        sudo_escalation_probing,
+        sudo_escalation_done,
+    } = Args::parse();
 
     // No need to run anything, just return
     // so that the invoker process knows we
     // can be invoked in Sudo as root
-    if args.sudo_escalation_probing {
+    if sudo_escalation_probing {
         return Ok(());
     }
 
@@ -231,7 +243,7 @@ fn try_main() -> anyhow::Result<()> {
 
     // Ensure we are running as root
     if get_effective_uid() != 0 {
-        if sudo_escalation_works() && !args.sudo_escalation_done {
+        if sudo_escalation_works() && !sudo_escalation_done {
             let exe = std::env::current_exe().unwrap();
             let args = std::env::args().skip(1);
 
@@ -253,28 +265,28 @@ fn try_main() -> anyhow::Result<()> {
         ));
     }
 
-    let allow = resolve_allow_block_entries("allow", std::mem::take(&mut args.allow))?;
-    let block = resolve_allow_block_entries("block", std::mem::take(&mut args.block))?;
+    let allow = resolve_allow_block_entries("allow", allow)?;
+    let block = resolve_allow_block_entries("block", block)?;
 
     // Set bootpd(8) min/max lease time while still having the root privileges
-    set_bootpd_lease_time(args.bootpd_lease_time);
+    set_bootpd_lease_time(bootpd_lease_time);
 
     // Initialize the proxy while still having the root privileges
     let mut proxy = Proxy::new(
-        args.vm_fd as RawFd,
-        args.vm_mac_address,
-        args.vm_net_type,
+        vm_fd as RawFd,
+        vm_mac_address,
+        vm_net_type,
         PrefixSet::from_iter(allow),
         PrefixSet::from_iter(block),
-        args.expose,
+        expose,
     )
     .context("failed to initialize proxy")?;
 
     // Drop effective privileges to the user
     // and group which have had invoked us
     PrivDrop::default()
-        .user(args.user.unwrap_or(current_user_name))
-        .group(args.group.unwrap_or(current_group_name))
+        .user(user.unwrap_or(current_user_name))
+        .group(group.unwrap_or(current_group_name))
         .apply()
         .context("failed to drop privileges")?;
 
@@ -325,15 +337,16 @@ mod tests {
     use std::net::Ipv4Addr;
 
     #[test]
-    fn resolve_domain_to_ipv4_nets_example_com() {
+    fn resolve_domain_to_ipv4_nets_dns_google() {
         let nets = resolve_allow_block_entries(
             "allow",
-            vec![AllowBlockEntry::Domain("example.com".to_string())],
+            vec![AllowBlockEntry::Domain("dns.google".to_string())],
         )
         .unwrap();
 
-        assert!(nets.contains(&Ipv4Net::from(Ipv4Addr::new(
-            93, 184, 216, 34
-        ))));
+        assert!(
+            nets.contains(&Ipv4Net::from(Ipv4Addr::new(8, 8, 8, 8)))
+                || nets.contains(&Ipv4Net::from(Ipv4Addr::new(8, 8, 4, 4)))
+        );
     }
 }
