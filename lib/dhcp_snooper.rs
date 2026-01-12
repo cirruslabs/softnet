@@ -2,7 +2,7 @@ use dhcproto::Decodable;
 use dhcproto::v4::{DhcpOption, MessageType, OptionCode};
 use smoltcp::wire::Ipv4Address;
 use std::collections::HashSet;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Default)]
 pub struct DhcpSnooper {
@@ -66,7 +66,7 @@ impl DhcpSnooper {
 #[derive(Debug)]
 pub struct Lease {
     address: Ipv4Address,
-    valid_until: Instant,
+    valid_until: coarsetime::Instant,
     dns_ips: HashSet<Ipv4Address>,
 }
 
@@ -74,7 +74,7 @@ impl Lease {
     pub fn new(address: Ipv4Address, lease_time: Duration, dns_ips: HashSet<Ipv4Address>) -> Lease {
         Lease {
             address,
-            valid_until: Instant::now() + lease_time,
+            valid_until: coarsetime::Instant::recent() + lease_time.into(),
             dns_ips,
         }
     }
@@ -84,7 +84,7 @@ impl Lease {
     }
 
     pub fn valid(&self) -> bool {
-        Instant::now() < self.valid_until
+        coarsetime::Instant::recent() < self.valid_until
     }
 
     pub fn valid_ip_source(&self, address: Ipv4Address) -> bool {

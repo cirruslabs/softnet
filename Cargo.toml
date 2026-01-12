@@ -33,6 +33,7 @@ ipnet = "2"
 oslog = "0.2.0"
 log = "0.4.29"
 serial_test = "3"
+coarsetime = "0.1.37"
 
 [profile.release]
 debug = true
