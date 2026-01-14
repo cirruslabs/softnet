@@ -18,6 +18,7 @@ use prefix_trie::{Prefix, PrefixMap, PrefixSet};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::time::Duration;
 use vmnet::Batch;
 
 pub struct Proxy<'proxy> {
@@ -48,7 +49,8 @@ impl Proxy<'_> {
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
-        let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
+        let poller_timeout = Duration::from_millis(100);
+        let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd(), poller_timeout)?;
 
         // Craft packet filter rules
         //
@@ -69,7 +71,7 @@ impl Proxy<'_> {
             host,
             poller,
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
-            dhcp_snooper: Default::default(),
+            dhcp_snooper: DhcpSnooper::new(poller_timeout),
             rules,
             enobufs_encountered: false,
             port_forwarder: PortForwarder::new(exposed_ports),

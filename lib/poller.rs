@@ -9,6 +9,7 @@ use std::time::Duration;
 pub struct Poller<'poller> {
     poller: polling::Poller,
     events: polling::Events,
+    timeout: Duration,
     vm_fd: BorrowedFd<'poller>,
     host_fd: BorrowedFd<'poller>,
 }
@@ -22,12 +23,17 @@ enum EventKey {
 }
 
 impl Poller<'_> {
-    pub fn new<'poller>(vm_fd: RawFd, host_fd: RawFd) -> Result<Poller<'poller>> {
+    pub fn new<'poller>(
+        vm_fd: RawFd,
+        host_fd: RawFd,
+        timeout: Duration,
+    ) -> Result<Poller<'poller>> {
         let poller = polling::Poller::new()?;
 
         Ok(Poller {
             poller,
             events: polling::Events::new(),
+            timeout,
             vm_fd: unsafe { BorrowedFd::borrow_raw(vm_fd) },
             host_fd: unsafe { BorrowedFd::borrow_raw(host_fd) },
         })
@@ -59,8 +65,7 @@ impl Poller<'_> {
     }
 
     pub fn wait(&mut self) -> Result<(bool, bool, bool)> {
-        self.poller
-            .wait(&mut self.events, Some(Duration::from_millis(100)))?;
+        self.poller.wait(&mut self.events, Some(self.timeout))?;
 
         let vm_readable = self
             .events

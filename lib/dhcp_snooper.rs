@@ -7,9 +7,17 @@ use std::time::Duration;
 #[derive(Default)]
 pub struct DhcpSnooper {
     vm_lease: Option<Lease>,
+    uncertainty_duration: Duration,
 }
 
 impl DhcpSnooper {
+    pub fn new(uncertainty_duration: Duration) -> Self {
+        DhcpSnooper {
+            uncertainty_duration,
+            ..Default::default()
+        }
+    }
+
     pub fn register_dhcp_reply(&mut self, dhcp_packet: &[u8]) {
         let mut decoder = dhcproto::v4::Decoder::new(dhcp_packet);
 
@@ -32,11 +40,12 @@ impl DhcpSnooper {
                     _ => HashSet::new(),
                 };
 
-                self.vm_lease = Some(Lease::new(
-                    message.yiaddr(),
-                    Duration::from_secs(*lease_time as u64),
-                    dns_ips,
-                ))
+                let mut lease_duration = Duration::from_secs(*lease_time as u64);
+
+                // Adjust for uncertainty caused by using a coarse clock
+                lease_duration = lease_duration.saturating_sub(self.uncertainty_duration);
+
+                self.vm_lease = Some(Lease::new(message.yiaddr(), lease_duration, dns_ips))
             }
             Some(MessageType::Nak) => {
                 self.vm_lease = None;
