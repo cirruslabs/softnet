@@ -9,7 +9,7 @@ use crate::host::Host;
 use crate::host::NetType;
 use crate::poller::Poller;
 use crate::vm::VM;
-use anyhow::{Context, Result};
+use anyhow::Result;
 pub use exposed_port::ExposedPort;
 use ipnet::Ipv4Net;
 use mac_address::MacAddress;
@@ -27,7 +27,6 @@ pub struct Proxy<'proxy> {
     poller: Poller<'proxy>,
     vm_mac_address: smoltcp::wire::EthernetAddress,
     dhcp_snooper: DhcpSnooper,
-    coarsetime_updater: coarsetime::Updater,
     rules: PrefixMap<Ipv4Net, Action>,
     enobufs_encountered: bool,
     port_forwarder: PortForwarder,
@@ -67,8 +66,7 @@ impl Proxy<'_> {
         }
 
         let coarsetime_update_interval_millis = 100;
-        let coarsetime_updater =
-            coarsetime::Updater::new(coarsetime_update_interval_millis).start()?;
+        coarsetime::Updater::new(coarsetime_update_interval_millis).start()?;
 
         Ok(Proxy {
             vm,
@@ -78,7 +76,6 @@ impl Proxy<'_> {
             dhcp_snooper: DhcpSnooper::new(Duration::from_millis(
                 coarsetime_update_interval_millis,
             )),
-            coarsetime_updater,
             rules,
             enobufs_encountered: false,
             port_forwarder: PortForwarder::new(exposed_ports),
@@ -122,12 +119,6 @@ impl Proxy<'_> {
 
             self.poller.rearm();
         }
-    }
-
-    pub fn shutdown(self) -> Result<()> {
-        self.coarsetime_updater
-            .stop()
-            .context("failed to shutdown coarsetime updater")
     }
 
     fn read_from_vm(&mut self, buf: &mut [u8]) -> Result<()> {
@@ -202,8 +193,6 @@ mod tests {
         );
 
         assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "66.66.66.66").is_none());
-
-        proxy.shutdown().unwrap();
     }
 
     #[test]
@@ -223,8 +212,6 @@ mod tests {
         assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.32").is_none());
         assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.33").is_some());
         assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.34").is_none());
-
-        proxy.shutdown().unwrap();
     }
 
     fn create_proxy<'test>(vm_ip: Ipv4Address, allow: Vec<&str>, block: Vec<&str>) -> Proxy<'test> {

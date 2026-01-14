@@ -211,9 +211,7 @@ fn try_main() -> anyhow::Result<()> {
         .context("failed to drop privileges")?;
 
     // Run proxy
-    proxy.run()?;
-
-    proxy.shutdown()
+    proxy.run()
 }
 
 fn sudo_escalation_works() -> bool {
