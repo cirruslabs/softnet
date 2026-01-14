@@ -124,6 +124,9 @@ impl Proxy<'_> {
         loop {
             match self.vm.read(buf) {
                 Ok(n) => {
+                    // Update coarse time for the DHCP snooper
+                    coarsetime::Instant::update();
+
                     if let Ok(frame) = EthernetFrame::new_checked(&buf[..n]) {
                         self.process_frame_from_vm(frame)?;
                     }
@@ -143,6 +146,9 @@ impl Proxy<'_> {
         loop {
             match self.host.read(batch, bufs) {
                 Ok(pktcnt) => {
+                    // Update coarse time for the DHCP snooper
+                    coarsetime::Instant::update();
+
                     for buf in batch.packet_sized_bufs(bufs).take(pktcnt) {
                         if let Ok(pkt) = EthernetFrame::new_checked(buf) {
                             self.process_frame_from_host(&pkt)?;
