@@ -94,6 +94,9 @@ impl Proxy<'_> {
         loop {
             let (vm_readable, host_readable, interrupt) = self.poller.wait()?;
 
+            // Update coarse time for the DHCP snooper
+            coarsetime::Instant::update();
+
             if vm_readable {
                 self.read_from_vm(buf.as_mut_slice())?;
             }
