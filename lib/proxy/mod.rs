@@ -49,7 +49,8 @@ impl Proxy<'_> {
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
         let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
-        let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd())?;
+        let poller_timeout = Duration::from_millis(100);
+        let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd(), poller_timeout)?;
 
         // Craft packet filter rules
         //
@@ -65,17 +66,12 @@ impl Proxy<'_> {
             rules.insert(block_net, Action::Block);
         }
 
-        let coarsetime_update_interval_millis = 100;
-        coarsetime::Updater::new(coarsetime_update_interval_millis).start()?;
-
         Ok(Proxy {
             vm,
             host,
             poller,
             vm_mac_address: smoltcp::wire::EthernetAddress(vm_mac_address.bytes()),
-            dhcp_snooper: DhcpSnooper::new(Duration::from_millis(
-                coarsetime_update_interval_millis,
-            )),
+            dhcp_snooper: DhcpSnooper::new(poller_timeout),
             rules,
             enobufs_encountered: false,
             port_forwarder: PortForwarder::new(exposed_ports),
