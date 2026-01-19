@@ -16,7 +16,7 @@ smoltcp = "0"
 libc = "0"
 polling = "3"
 dhcproto = { git = "https://github.com/bluecatengineering/dhcproto.git", branch = "master" }
-vmnet = "0.5.0"
+vmnet = "0.5.1"
 clap = { version = "4", features = ["derive"] }
 mac_address = "1"
 privdrop = "0"
