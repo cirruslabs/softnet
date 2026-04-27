@@ -368,9 +368,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "clap"
-version = "4.6.0"
+version = "4.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b193af5b67834b676abd72466a96c1024e6a6ad978a1f484bd90b85c94041351"
+checksum = "1ddb117e43bbf7dacf0a4190fef4d345b9bad68dfc649cb349e7d17d28428e51"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -390,9 +390,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.6.0"
+version = "4.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1110bd8a634a1ab8cb04345d8d878267d57c3cf1b38d91b71af6686408bbca6a"
+checksum = "f2ce8604710f6733aa641a2b3731eaa1e8b3d9973d5e3565da11800813f997a9"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -618,7 +618,7 @@ dependencies = [
 [[package]]
 name = "dhcproto"
 version = "0.14.0"
-source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#b4ea30defc01e7ae66e7075d6a0533d9bb9503dc"
+source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#8db488ef05301e255e1e66f1ff174fc97fd5cd61"
 dependencies = [
  "dhcproto-macros",
  "hickory-proto",
@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "dhcproto-macros"
 version = "0.2.0"
-source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#b4ea30defc01e7ae66e7075d6a0533d9bb9503dc"
+source = "git+https://github.com/bluecatengineering/dhcproto.git?branch=master#8db488ef05301e255e1e66f1ff174fc97fd5cd61"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1349,9 +1349,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.183"
+version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
+checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "linux-raw-sys"
