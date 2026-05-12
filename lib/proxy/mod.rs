@@ -14,10 +14,11 @@ pub use exposed_port::ExposedPort;
 use ipnet::Ipv4Net;
 use mac_address::MacAddress;
 use port_forwarder::PortForwarder;
-use prefix_trie::{Prefix, PrefixMap, PrefixSet};
+use prefix_trie::{Prefix, PrefixMap};
 use smoltcp::wire::EthernetFrame;
 use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::str::FromStr;
 use std::time::Duration;
 use vmnet::Batch;
 
@@ -32,6 +33,24 @@ pub struct Proxy<'proxy> {
     port_forwarder: PortForwarder,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Target {
+    Prefix(Ipv4Net),
+    Host,
+}
+
+impl FromStr for Target {
+    type Err = ipnet::AddrParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s == "@host" {
+            return Ok(Target::Host);
+        }
+
+        Ipv4Net::from_str(s).map(Target::Prefix)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Action {
     Block,
@@ -43,12 +62,15 @@ impl Proxy<'_> {
         vm_fd: RawFd,
         vm_mac_address: MacAddress,
         vm_net_type: NetType,
-        allow: PrefixSet<Ipv4Net>,
-        block: PrefixSet<Ipv4Net>,
+        allow: Vec<Target>,
+        block: Vec<Target>,
         exposed_ports: Vec<ExposedPort>,
     ) -> Result<Proxy<'proxy>> {
         let vm = VM::new(vm_fd)?;
-        let host = Host::new(vm_net_type, !allow.contains(&Ipv4Net::zero()))?;
+        let host = Host::new(
+            vm_net_type,
+            !allow.contains(&Target::Prefix(Ipv4Net::zero())),
+        )?;
         let poller_timeout = Duration::from_millis(100);
         let poller = Poller::new(vm.as_raw_fd(), host.as_raw_fd(), poller_timeout)?;
 
@@ -58,12 +80,22 @@ impl Proxy<'_> {
         // over allowing rules when prefixes are identical.
         let mut rules = PrefixMap::new();
 
-        for allow_net in allow {
-            rules.insert(allow_net, Action::Allow);
+        for allow_target in allow {
+            let allow_prefix = match allow_target {
+                Target::Prefix(prefix) => prefix,
+                Target::Host => host.gateway_ip.into(),
+            };
+
+            rules.insert(allow_prefix, Action::Allow);
         }
 
-        for block_net in block {
-            rules.insert(block_net, Action::Block);
+        for block_target in block {
+            let block_prefix = match block_target {
+                Target::Prefix(prefix) => prefix,
+                Target::Host => host.gateway_ip.into(),
+            };
+
+            rules.insert(block_prefix, Action::Block);
         }
 
         Ok(Proxy {
@@ -175,7 +207,7 @@ mod tests {
     use ipnet::Ipv4Net;
     use mac_address::MacAddress;
     use nix::sys::socket::{AddressFamily, SockFlag, SockType, socketpair};
-    use prefix_trie::{PrefixMap, PrefixSet};
+    use prefix_trie::PrefixMap;
     use serial_test::serial;
     use smoltcp::wire::{Ipv4Address, Ipv4Packet};
     use std::collections::HashSet;
@@ -219,6 +251,27 @@ mod tests {
         assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "33.33.33.34").is_none());
     }
 
+    #[test]
+    #[serial]
+    fn test_allow_host() {
+        let vm_ip = Ipv4Address::from_str("192.168.0.2").unwrap();
+        let proxy = create_proxy(vm_ip, vec!["@host"], vec!["0.0.0.0/0"]);
+
+        assert_eq!(
+            proxy.rules,
+            PrefixMap::from_iter(vec![
+                (proxy.host.gateway_ip.into(), Action::Allow),
+                (Ipv4Net::from_str("0.0.0.0/0").unwrap(), Action::Block),
+            ])
+        );
+
+        // Access to global IPs should be disallowed because of --block=0.0.0.0/0
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, "8.8.8.8").is_none());
+
+        // Despite the above, access to host IP address should be possible because of --allow=@host
+        assert!(allowed_from_vm_ipv4(&proxy, vm_ip, &proxy.host.gateway_ip.to_string()).is_some());
+    }
+
     fn create_proxy<'test>(vm_ip: Ipv4Address, allow: Vec<&str>, block: Vec<&str>) -> Proxy<'test> {
         let (vm_fd, _) = socketpair(
             AddressFamily::Unix,
@@ -233,16 +286,14 @@ mod tests {
             vm_fd.as_raw_fd(),
             MacAddress::from_str("02:00:00:00:00:01").unwrap(),
             NetType::Nat,
-            PrefixSet::from_iter(
-                allow
-                    .into_iter()
-                    .map(|cidr| Ipv4Net::from_str(cidr).unwrap()),
-            ),
-            PrefixSet::from_iter(
-                block
-                    .into_iter()
-                    .map(|cidr| Ipv4Net::from_str(cidr).unwrap()),
-            ),
+            allow
+                .into_iter()
+                .map(|cidr| cidr.parse().unwrap())
+                .collect(),
+            block
+                .into_iter()
+                .map(|cidr| cidr.parse().unwrap())
+                .collect(),
             Vec::default(),
         )
         .unwrap();
