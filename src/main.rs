@@ -52,13 +52,14 @@ struct Args {
     #[clap(
         long,
         help = "Comma-separated list of CIDRs to allow the traffic to \
-        (e.g. --allow=192.168.0.0/24 may be used to allow a LAN access for a VM) \
-        or @host to match the vmnet bridge gateway IP. \
+        (e.g. --allow=192.168.0.0/24 may be used to allow a LAN access for a VM), \
+        plus supported @-aliases. Currently the only supported @-alias is @host, \
+        which matches the vmnet bridge gateway IP. \
         When used with --block, the longest prefix match always wins. \
         In case an identical prefix is both --allow'ed and --block'ed, \
         blocking will take precedence. --allow=0.0.0.0/0 is a special case, \
         it additionally disables bridge isolation (even when --block=0.0.0.0/0 is specified).",
-        value_name = "comma-separated CIDRs or @host",
+        value_name = "comma-separated CIDRs or @-alias",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
@@ -68,10 +69,12 @@ struct Args {
         long,
         help = "Comma-separated list of CIDRs to block the traffic to \
         (e.g. --block=0.0.0.0/0 may be used to establish a default deny policy \
-        that is further relaxed with --allow) or @host to match the vmnet bridge gateway IP. \
-        the longest prefix match always wins. In case the same prefix is both \
-        --allow'ed and --block'ed, blocking takes precedence.",
-        value_name = "comma-separated CIDRs or @host",
+        that is further relaxed with --allow), plus supported @-aliases. \
+        Currently the only supported @-alias is @host, which matches the vmnet bridge gateway IP. \
+        When used with --allow, the longest prefix match always wins. \
+        In case an identical prefix is both --allow'ed and --block'ed, \
+        blocking will take precedence.",
+        value_name = "comma-separated CIDRs or @-alias",
         use_value_delimiter = true,
         action = clap::ArgAction::Set
     )]
